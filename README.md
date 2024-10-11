@@ -39,19 +39,19 @@ plot_evolution(
 
 ```
 
-    - payoff_functions: A tuple of three payoff functions corresponding to each strategy.
-    - x0_list: A vector of initial conditions (strategy frequencies) to simulate trajectories.
-    - tspan: A tuple representing the time span for the simulation, e.g., (0.0, 1000.0).
-    - labels: Labels for the corners of the simplex. Default is ["Strategy 1", "Strategy 2", "Strategy 3"].
-    - extra_params: A NamedTuple that can pass extra parameters to the payoff functions.
-    - steady_state_tol: The tolerance level for determining when a trajectory reaches steady state.
-    - arrow_list: A list of indices to draw arrows along the trajectory, useful for indicating direction of change.
-    - trajectory_labels: Labels for each trajectory. Defaults to a numbered list.
-    - trajectory_colors: Colors for each trajectory. If colored_trajectories is false, all trajectories will be black.
-    - num_initial_guesses: Number of initial guesses to use when finding equilibria.
-    - equilibria_tol: Tolerance for determining when a point is an equilibrium.
-    - eq_size: The size of the marker for equilibrium points.
-    - colored_trajectories: Boolean flag indicating whether to color the trajectories or keep them black.
+    payoff_functions: A tuple of three payoff functions corresponding to each strategy.
+    x0_list: A vector of initial conditions (strategy frequencies) to simulate trajectories.
+    tspan: A tuple representing the time span for the simulation, e.g., (0.0, 1000.0).
+    labels: Labels for the corners of the simplex. Default is ["Strategy 1", "Strategy 2", "Strategy 3"].
+    extra_params: A NamedTuple that can pass extra parameters to the payoff functions.
+    steady_state_tol: The tolerance level for determining when a trajectory reaches steady state.
+    arrow_list: A list of indices to draw arrows along the trajectory, useful for indicating direction of change.
+    trajectory_labels: Labels for each trajectory. Defaults to a numbered list.
+    trajectory_colors: Colors for each trajectory. If colored_trajectories is false, all trajectories will be black.
+    num_initial_guesses: Number of initial guesses to use when finding equilibria.
+    equilibria_tol: Tolerance for determining when a point is an equilibrium.
+    eq_size: The size of the marker for equilibrium points.
+    colored_trajectories: Boolean flag indicating whether to color the trajectories or keep them black.
 
 ### Example 1: Basic Hawk-Dove Dynamics
 
@@ -137,10 +137,10 @@ In this example, the cyclic nature of the Rock-Paper-Scissors game is shown as e
 
 You can customize several aspects of the plot, including the colors of the trajectories, labels for each strategy, and where arrows are drawn to indicate the direction of the population's evolution.
 
-    - arrow_list: A vector specifying where arrows should be placed along the trajectory.
-    - trajectory_labels: Provide custom labels for the trajectories.
-    - trajectory_colors: Customize the colors of the trajectories.
-    - colored_trajectories: Set this flag to true to have different colors for each trajectory, or keep it false for black trajectories.
+    arrow_list: A vector specifying where arrows should be placed along the trajectory.
+    trajectory_labels: Provide custom labels for the trajectories.
+    trajectory_colors: Customize the colors of the trajectories.
+    colored_trajectories: Set this flag to true to have different colors for each trajectory, or keep it false for black trajectories.
 
 ### Equilibria and Stability
 
