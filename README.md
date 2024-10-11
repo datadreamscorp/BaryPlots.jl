@@ -1,7 +1,8 @@
 # BaryPlots.jl
 
-BaryPlots is a Julia package designed to visualize the evolutionary dynamics of strategies in population games. It provides tools for plotting trajectories on a ternary simplex and determining the equilibria of the dynamics.
-Installation
+BaryPlots is a Julia package designed to visualize the evolutionary dynamics of strategies in population games, inspired by Richard McElreath's [baryplot R package](https://github.com/rmcelreath/baryplot). It provides tools for plotting trajectories on a ternary simplex and determining the equilibria of the dynamics.
+
+### Installation
 
 To install BaryPlots, simply add the package from your local environment or by cloning the repository:
 
@@ -195,4 +196,4 @@ You can customize several aspects of the plot, including the colors of the traje
 
 ### Equilibria and Stability
 
-The plot_evolution function automatically calculates the equilibria of the system and determines whether each equilibrium is stable. Stable equilibria are marked with filled black circles, while unstable equilibria are marked with hollow circles.
+The `plot_evolution` function automatically calculates the equilibria of the system and determines whether each equilibrium is stable. Stable equilibria are marked with filled black circles, while unstable equilibria are marked with hollow circles.
