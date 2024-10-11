@@ -76,14 +76,15 @@ end
 
 ```julia
 
-payoff_functions = (hd_payoff_H, hd_payoff_D, (x, t, params) -> 0.0)
+payoff_functions = (hd_payoff_H, hd_payoff_D, (x, t, params) -> 0.0) # Use a dummy function for the third strategy
 initial_conditions = [[0.8, 0.2, 0.0], [0.3, 0.7, 0.0]]  # Two starting points
 
 plot_evolution(
     payoff_functions,
     initial_conditions,
-    (0.0, 10.0),
-    labels=["Hawk", "Dove", "Dummy"]
+    (0.0, 100.0),
+    labels=["Hawk", "Dove", "Dummy"],
+    arrow_list = [[300], [400]]
 )
 
 ```
@@ -91,47 +92,96 @@ plot_evolution(
 This simulates the evolution of the Hawk-Dove game starting from two different initial conditions. The strategies "Hawk" and "Dove" evolve over time, and the dynamics are plotted on a simplex.
 
 
-Example 2: Rock-Paper-Scissors Game
+### Example 2: Rock-Paper-Scissors Game
 
 In this example, we simulate the evolution of strategies in the Rock-Paper-Scissors game, where each strategy cyclically dominates another.
 
 ```julia
 
-using BaryPlots
-
 # Payoff for Rock (R)
-function rps_payoff_R(x, t, params)
-    R, P, S = x[1], x[2], x[3]
-    return 0 * R + 1 * S  # Rock beats Scissors
-end
-
-# Payoff for Paper (P)
-function rps_payoff_P(x, t, params)
-    R, P, S = x[1], x[2], x[3]
-    return 0 * P + 1 * R  # Paper beats Rock
-end
-
-# Payoff for Scissors (S)
-function rps_payoff_S(x, t, params)
-    R, P, S = x[1], x[2], x[3]
-    return 0 * S + 1 * P  # Scissors beat Paper
-end
-
-# Initial conditions
-initial_conditions = [[0.6, 0.3, 0.1], [0.2, 0.4, 0.4]]
-
-# Simulate and plot
-plot_evolution(
-    (rps_payoff_R, rps_payoff_P, rps_payoff_S),
-    initial_conditions,
-    (0.0, 10.0),
-    labels=["Rock", "Paper", "Scissors"],
-    colored_trajectories = true
-)
+	function rps_payoff_R(x, t, params)
+	    R, P, S = x[1], x[2], x[3]
+	    return 0 * R + 1 * S - 1 * P  # Rock beats Scissors
+	end
+	
+	# Payoff for Paper (P)
+	function rps_payoff_P(x, t, params)
+	    R, P, S = x[1], x[2], x[3]
+	    return 0 * P + 1 * R - 1 * S # Paper beats Rock
+	end
+	
+	# Payoff for Scissors (S)
+	function rps_payoff_S(x, t, params)
+	    R, P, S = x[1], x[2], x[3]
+	    return 0 * S + 1 * P - 1 * R  # Scissors beat Paper
+	end
+	
+	# Initial conditions
+	initial_conditions = [[0.6, 0.3, 0.1], [0.2, 0.4, 0.4]]
+	
+	# Simulate and plot
+	plot_evolution(
+	    (rps_payoff_R, rps_payoff_P, rps_payoff_S),
+	    initial_conditions,
+	    (0.0, 100.0),
+	    labels=["Rock", "Paper", "Scissors"],
+        arrow_list = [[100], [100]],
+	    colored_trajectories = true
+	)
 
 ```
 
 In this example, the cyclic nature of the Rock-Paper-Scissors game is shown as each strategy's population evolves over time. The trajectories are colored by default to make the different dynamics stand out.
+
+
+### Example 3: Parameterized Game - Public Goods with Variable Benefit Multiplier
+
+In this example, we explore a parameterized version of the Public Goods Game, where the payoff for contributing depends on a benefit multiplier, `b`. We will vary `b` to examine how it impacts the dynamics of contribution and free-riding in the population.
+
+#### Defining the Parameterized Game
+
+```julia
+# Define the payoffs for Contribute (C) and Free Ride (F)
+function pg_payoff_C(x, t, params)
+    b = params.b
+    C = x[1]
+    F = x[2]
+    return b * C + 0 * F
+end
+
+function pg_payoff_F(x, t, params)
+    b = params.b
+    C = x[1]
+    F = x[2]
+    return (b + 1) * C + 1 * F
+end
+
+function pg_payoff_dummy(x, t, params)
+    return 0.0
+end
+
+# Set up the parameterized game with benefit multiplier b = 2.5
+params = (b = 2.5,)
+payoff_functions = (pg_payoff_C, pg_payoff_F, pg_payoff_dummy)
+
+# Initial conditions for different starting frequencies of strategies
+initial_conditions = [
+    [0.9, 0.1, 0.0],   # Mostly contributors
+    [0.5, 0.5, 0.0],   # Half contributors, half free-riders
+    [0.1, 0.9, 0.0]    # Mostly free-riders
+]
+
+# Simulate and plot the dynamics
+plot_evolution(
+    payoff_functions,
+    initial_conditions,
+    (0.0, 100.0);
+    labels=["Contribute", "Free Ride", "Dummy"],
+    extra_params=params,
+    colored_trajectories=true,
+    arrow_list=[[10, 50, 100], [20, 70], [30, 90]]
+)
+
 
 ### Customization Options
 
