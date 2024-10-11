@@ -76,14 +76,14 @@ end
 
 ```julia
 
-payoff_functions = (hd_payoff_H, hd_payoff_D, (x, t, params) -> 0.0) # Use a dummy function for the third strategy
+payoff_functions = (hd_payoff_H, hd_payoff_D, (x, t, params) -> 0.0) # Use a dummy function for the third "Loner" strategy
 initial_conditions = [[0.8, 0.2, 0.0], [0.3, 0.7, 0.0]]  # Two starting points
 
 plot_evolution(
     payoff_functions,
     initial_conditions,
     (0.0, 100.0),
-    labels=["Hawk", "Dove", "Dummy"],
+    labels=["Hawk", "Dove", "Loner"],
     arrow_list = [[300], [400]]
 )
 
@@ -134,9 +134,9 @@ In this example, we simulate the evolution of strategies in the Rock-Paper-Sciss
 In this example, the cyclic nature of the Rock-Paper-Scissors game is shown as each strategy's population evolves over time. The trajectories are colored by default to make the different dynamics stand out.
 
 
-### Example 3: Parameterized Game - Public Goods with Variable Benefit Multiplier
+### Example 3: Parameterized Game - Public Goods Game with Diminished Free-Rider Returns
 
-In this example, we explore a parameterized version of the Public Goods Game, where the payoff for contributing depends on a benefit multiplier, `b`. We will vary `b` to examine how it impacts the dynamics of contribution and free-riding in the population.
+In this example, we explore a parameterized version of the Public Goods Game, where the payoff for contributing depends on a benefit multiplier, `b`. Free Riders only get half of the benefit during interactions, potentially decreasing the incentive for free riding depending on the size of `b`. We can vary `b` to examine how it impacts the dynamics of contribution and free-riding in the population.
 
 #### Defining the Parameterized Game
 
@@ -154,7 +154,7 @@ function pg_payoff_F(x, t, params)
     b = params.b
     C = x[1]
     F = x[2]
-    return (b + 1) * C + 1 * F
+    return (b/2) * C + 1 * F
 end
 
 function pg_payoff_dummy(x, t, params)
@@ -162,25 +162,24 @@ function pg_payoff_dummy(x, t, params)
 end
 
 # Set up the parameterized game with benefit multiplier b = 2.5
-params = (b = 2.5,)
-payoff_functions = (pg_payoff_C, pg_payoff_F, pg_payoff_dummy)
+params = (b = 5.0,)
+payoff_funcs = (pg_payoff_C, pg_payoff_F, pg_payoff_dummy)
 
 # Initial conditions for different starting frequencies of strategies
 initial_conditions = [
-    [0.9, 0.1, 0.0],   # Mostly contributors
-    [0.5, 0.5, 0.0],   # Half contributors, half free-riders
-    [0.1, 0.9, 0.0]    # Mostly free-riders
+    [0.3, 0.7, 0.0],
+    [0.27, 0.73, 0.0]
 ]
 
 # Simulate and plot the dynamics
 plot_evolution(
-    payoff_functions,
+    payoff_funcs,
     initial_conditions,
     (0.0, 100.0);
-    labels=["Contribute", "Free Ride", "Dummy"],
+    labels=["Contribute", "Free Ride", "Loner"],
     extra_params=params,
     colored_trajectories=true,
-    arrow_list=[[10, 50, 100], [20, 70], [30, 90]]
+    arrow_list=[[200, 500], [200, 300]]
 )
 
 ```
