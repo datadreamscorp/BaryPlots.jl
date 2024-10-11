@@ -141,6 +141,7 @@ In this example, we explore a parameterized version of the Public Goods Game, wh
 #### Defining the Parameterized Game
 
 ```julia
+
 # Define the payoffs for Contribute (C) and Free Ride (F)
 function pg_payoff_C(x, t, params)
     b = params.b
@@ -182,6 +183,7 @@ plot_evolution(
     arrow_list=[[10, 50, 100], [20, 70], [30, 90]]
 )
 
+```
 
 ### Customization Options
 
