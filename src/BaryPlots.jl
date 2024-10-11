@@ -171,6 +171,7 @@ a ternary simplex. It also computes and plots the equilibria of the system.
         num_initial_guesses::Int = 1000,
         equilibria_tol::Float64 = 1e-8,
         eq_size = 6,
+        colored_trajectories = false,
         kwargs...
     )
         num_trajectories = length(x0_list)
@@ -179,11 +180,12 @@ a ternary simplex. It also computes and plots the equilibria of the system.
         if isempty(trajectory_labels)
             trajectory_labels = ["Trajectory $(i)" for i in 1:num_trajectories]
         end
+
         if isempty(trajectory_colors)
-            trajectory_colors = [
+            trajectory_colors =  colored_trajectories ? [
                 palette(:tab10)[(i - 1) % 10 + 1] 
                 for i in 1:num_trajectories
-                ]
+                ] : repeat(["black"], num_trajectories)
         end
     
         # Prepare the parameters
