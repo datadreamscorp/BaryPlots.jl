@@ -7,7 +7,7 @@ To install BaryPlots, simply add the package from your local environment or by c
 
 ```julia
 
-] add https://github.com/datadreams/BaryPlots.jl
+] add https://github.com/datadreamscorp/BaryPlots.jl
 
 ```
 
