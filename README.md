@@ -66,6 +66,7 @@ plot_evolution(
     equilibria_tol: Tolerance for determining when a point is an equilibrium.
     
     eq_size: The size of the marker for equilibrium points.
+
     colored_trajectories: Boolean flag indicating whether to color the trajectories or keep them black.
 
 
@@ -230,3 +231,18 @@ You can customize several aspects of the plot, including the colors of the traje
 ### Equilibria and Stability
 
 The `plot_evolution` function automatically calculates the equilibria of the system and determines whether each equilibrium is stable. Stable equilibria are marked with filled black circles, while unstable equilibria are marked with hollow circles.
+
+### License
+
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+
+### Acknowledgments
+
+This package makes use of several outstanding Julia packages:
+
+- **[DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl)**
+- **[ForwardDiff.jl](https://github.com/JuliaDiff/ForwardDiff.jl)**
+- **[Plots.jl](https://github.com/JuliaPlots/Plots.jl)**
+- **[NLsolve.jl](https://github.com/JuliaNLSolvers/NLsolve.jl)**
+
+These dependencies are critical to the functionality of this package, and we thank the authors for their valuable contributions.
