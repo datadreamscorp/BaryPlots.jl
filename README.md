@@ -126,7 +126,7 @@ In this example, we simulate the evolution of strategies in the Rock-Paper-Sciss
 	    initial_conditions,
 	    (0.0, 100.0),
 	    labels=["Rock", "Paper", "Scissors"],
-        arrow_list = [ [100], [100] ],
+            arrow_list = [ [100], [100] ],
 	    colored_trajectories = true
 	)
 
