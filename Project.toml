@@ -1,7 +1,7 @@
 name = "BaryPlots"
 uuid = "435fd04b-d7a1-466b-a36d-8293cbb03b07"
 authors = ["aureliano <datadreamscorp@protonmail.com>"]
-version = "0.1.0
+version = "0.1.0"
 
 [deps]
 DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
@@ -13,10 +13,8 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 julia = "1.6"
-DifferentialEquations = "7.14.0"
-ForwardDiff = "0.10.36"
-LinearAlgebra = "1.0"
-NLsolve = "4.5.1"
-Plots = "1.40.8"
-Test = "1.0"
+DifferentialEquations = "7.14"
+ForwardDiff = "0.10"
+NLsolve = "4.5"
+Plots = "1.40"
 
