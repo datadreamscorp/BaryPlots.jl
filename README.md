@@ -1,5 +1,7 @@
 # BaryPlots.jl
 
+![](./images/splash.png)
+
 BaryPlots is a Julia package designed to visualize the evolutionary dynamics of strategies in population games, inspired by Richard McElreath's [baryplot R package](https://github.com/rmcelreath/baryplot). It provides tools for plotting trajectories on a ternary simplex and determining the equilibria of the dynamics.
 
 ### Installation
@@ -56,6 +58,8 @@ plot_evolution(
 
 ### Example 1: Basic Hawk-Dove Dynamics
 
+![](./images/HD_game.png)
+
 ```julia
 
 using BaryPlots
@@ -77,15 +81,23 @@ end
 
 ```julia
 
-payoff_functions = (hd_payoff_H, hd_payoff_D, (x, t, params) -> 0.0) # Use a dummy function for the third "Loner" strategy
-initial_conditions = [[0.8, 0.2, 0.0], [0.3, 0.7, 0.0]]  # Two starting points
+payoff_functions = (
+    hd_payoff_H, 
+    hd_payoff_D, 
+    (x, t, params) -> 0.0
+    ) # Use a dummy function for the third "Loner" strategy
+
+initial_conditions = [
+    [0.35, 0.65, 0.0], 
+    [0.33, 0.67, 0.0]
+    ]  # Two starting points
 
 plot_evolution(
     payoff_functions,
     initial_conditions,
     (0.0, 100.0),
     labels = ["Hawk", "Dove", "Loner"],
-    arrow_list = [ [300], [400] ]
+    arrow_list = [ [300], [600], ]
 )
 
 ```
@@ -94,6 +106,8 @@ This simulates the evolution of the Hawk-Dove game starting from two different i
 
 
 ### Example 2: Rock-Paper-Scissors Game
+
+![](./images/RPS_game.png)
 
 In this example, we simulate the evolution of strategies in the Rock-Paper-Scissors game, where each strategy cyclically dominates another.
 
@@ -118,7 +132,10 @@ In this example, we simulate the evolution of strategies in the Rock-Paper-Sciss
 	end
 	
 	# Initial conditions
-	initial_conditions = [[0.6, 0.3, 0.1], [0.2, 0.4, 0.4]]
+	initial_conditions = [
+        [0.6, 0.3, 0.1], 
+        [0.2, 0.4, 0.4]
+        ]
 	
 	# Simulate and plot
 	plot_evolution(
@@ -126,7 +143,7 @@ In this example, we simulate the evolution of strategies in the Rock-Paper-Sciss
 	    initial_conditions,
 	    (0.0, 100.0),
 	    labels=["Rock", "Paper", "Scissors"],
-            arrow_list = [ [100], [100] ],
+        arrow_list = [ [100], [100] ],
 	    colored_trajectories = true
 	)
 
@@ -136,6 +153,8 @@ In this example, the cyclic nature of the Rock-Paper-Scissors game is shown as e
 
 
 ### Example 3: Parameterized Game - Public Goods Game with Diminished Free-Rider Returns
+
+![](./images/PG_game.png)
 
 In this example, we explore a parameterized version of the Public Goods Game, where the payoff for contributing depends on a benefit multiplier, `b`. Free Riders only get half of the benefit during interactions, potentially decreasing the incentive for free riding depending on the size of `b`. We can vary `b` to examine how it impacts the dynamics of contribution and free-riding in the population.
 
@@ -163,24 +182,25 @@ function pg_payoff_dummy(x, t, params)
 end
 
 # Set up the parameterized game with benefit multiplier b = 2.5
-params = (b = 5.0,)
-payoff_funcs = (pg_payoff_C, pg_payoff_F, pg_payoff_dummy)
+params = (b = 2.0, )
+payoff_functions = (pg_payoff_C, pg_payoff_F, pg_payoff_dummy)
 
 # Initial conditions for different starting frequencies of strategies
 initial_conditions = [
-    [0.3, 0.7, 0.0],
-    [0.27, 0.73, 0.0]
+    [0.51, 0.49, 0.0],
+    [0.49, 0.51, 0.0],
+	[0.1, 0.1, 0.80]
 ]
 
 # Simulate and plot the dynamics
 plot_evolution(
-    payoff_funcs,
+    payoff_functions,
     initial_conditions,
     (0.0, 100.0);
     labels = ["Contribute", "Free Ride", "Loner"],
     extra_params = params,
     colored_trajectories = true,
-    arrow_list = [ [200, 500], [200, 300] ]
+    arrow_list = [ [500, 1000], [500, 1000], [200] ]
 )
 
 ```
