@@ -150,7 +150,7 @@ In this example, we simulate the evolution of strategies in the Rock-Paper-Sciss
 
 ```
 
-The cyclic nature of the Rock-Paper-Scissors game is shown as each strategy's population evolves over time. The trajectories are colored by default to make the different dynamics stand out.
+The cyclic nature of the Rock-Paper-Scissors game is shown as each strategy's population evolves over time. The trajectories are optionally colored to make the different dynamics stand out.
 
 
 ### Example 3: Parameterized Game - Public Goods Game with Diminished Free-Rider Returns
