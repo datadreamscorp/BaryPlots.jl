@@ -1,6 +1,6 @@
 # BaryPlots.jl
 
-![](./images/splash.png)
+<img src="./images/splash.png" alt="" width="300"/>
 
 BaryPlots is a Julia package designed to visualize the evolutionary dynamics of strategies in population games, inspired by Richard McElreath's [baryplot R package](https://github.com/rmcelreath/baryplot). It provides tools for plotting trajectories on a ternary simplex and determining the equilibria of the dynamics.
 
@@ -58,7 +58,7 @@ plot_evolution(
 
 ### Example 1: Basic Hawk-Dove Dynamics
 
-![](./images/HD_game.png)
+<img src="./images/HD_game.png" alt="" width="300"/>
 
 ```julia
 
@@ -107,7 +107,7 @@ This simulates the evolution of the Hawk-Dove game starting from two different i
 
 ### Example 2: Rock-Paper-Scissors Game
 
-![](./images/RPS_game.png)
+<img src="./images/RPS_game.png" alt="" width="300"/>
 
 In this example, we simulate the evolution of strategies in the Rock-Paper-Scissors game, where each strategy cyclically dominates another.
 
@@ -154,7 +154,7 @@ In this example, the cyclic nature of the Rock-Paper-Scissors game is shown as e
 
 ### Example 3: Parameterized Game - Public Goods Game with Diminished Free-Rider Returns
 
-![](./images/PG_game.png)
+<img src="./images/PG_game.png" alt="" width="300"/>
 
 In this example, we explore a parameterized version of the Public Goods Game, where the payoff for contributing depends on a benefit multiplier, `b`. Free Riders only get half of the benefit during interactions, potentially decreasing the incentive for free riding depending on the size of `b`. We can vary `b` to examine how it impacts the dynamics of contribution and free-riding in the population.
 
