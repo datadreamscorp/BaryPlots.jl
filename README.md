@@ -1,6 +1,6 @@
 # BaryPlots.jl
 
-<img src="./images/splash.png" alt="" width="600"/>
+<img src="./images/splash.png" alt="" width="500"/>
 
 BaryPlots is a Julia package designed to visualize the evolutionary dynamics of strategies in population games, inspired by Richard McElreath's [baryplot R package](https://github.com/rmcelreath/baryplot). It provides tools for plotting trajectories on a ternary simplex and determining the equilibria of the dynamics.
 
@@ -17,7 +17,8 @@ To install BaryPlots, simply add the package from your local environment or by c
 ### Overview
 
 BaryPlots focuses on simulating and visualizing the evolution of strategy frequencies over time in evolutionary games. The core of the package is the plot_evolution function, which allows you to simulate population dynamics under various payoff structures and plot the results in a visually clear format.
-plot_evolution Function
+
+#### `plot_evolution` Function
 
 The plot_evolution function simulates and plots the evolution of strategy frequencies over time using replicator dynamics. This function is especially useful in evolutionary game theory to track how different strategies fare in a population.
 
@@ -149,7 +150,7 @@ In this example, we simulate the evolution of strategies in the Rock-Paper-Sciss
 
 ```
 
-In this example, the cyclic nature of the Rock-Paper-Scissors game is shown as each strategy's population evolves over time. The trajectories are colored by default to make the different dynamics stand out.
+The cyclic nature of the Rock-Paper-Scissors game is shown as each strategy's population evolves over time. The trajectories are colored by default to make the different dynamics stand out.
 
 
 ### Example 3: Parameterized Game - Public Goods Game with Diminished Free-Rider Returns
