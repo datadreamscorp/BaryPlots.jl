@@ -10,6 +10,14 @@ To install BaryPlots, simply add the package from your local environment or by c
 
 ```julia
 
+] add BaryPlots
+
+```
+
+or clone into the repository:
+
+```julia
+
 ] add https://github.com/datadreamscorp/BaryPlots.jl
 
 ```
@@ -246,3 +254,11 @@ This package makes use of several outstanding Julia packages:
 - **[NLsolve.jl](https://github.com/JuliaNLSolvers/NLsolve.jl)**
 
 These dependencies are critical to the functionality of this package, and we thank the authors for their valuable contributions.
+
+### Citing BaryPlots
+
+If you use `BaryPlots.jl` in your research, please cite it as:
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13923783.svg)](https://doi.org/10.5281/zenodo.13923783)
+
+You can also download the citation in BibTeX, RIS, or other formats from Zenodo.
