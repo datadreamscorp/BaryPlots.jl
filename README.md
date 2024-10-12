@@ -232,8 +232,11 @@ plot_evolution(
 You can customize several aspects of the plot, including the colors of the trajectories, labels for each strategy, and where arrows are drawn to indicate the direction of the population's evolution.
 
     arrow_list: A vector specifying where arrows should be placed along the trajectory.
+
     trajectory_labels: Provide custom labels for the trajectories.
+
     trajectory_colors: Customize the colors of the trajectories.
+    
     colored_trajectories: Set this flag to true to have different colors for each trajectory, or keep it false for black trajectories.
 
 ### Equilibria and Stability
