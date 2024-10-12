@@ -20,7 +20,7 @@ BaryPlots focuses on simulating and visualizing the evolution of strategy freque
 
 #### `plot_evolution` Function
 
-The plot_evolution function simulates and plots the evolution of strategy frequencies over time using replicator dynamics. This function is especially useful in evolutionary game theory to track how different strategies fare in a population.
+The `plot_evolution` function simulates and plots the evolution of strategy frequencies over time using replicator dynamics. This function is especially useful in evolutionary game theory to track how different strategies fare in a population.
 
 ```julia
 
@@ -44,18 +44,30 @@ plot_evolution(
 ```
 
     payoff_functions: A tuple of three payoff functions corresponding to each strategy.
+    
     x0_list: A vector of initial conditions (strategy frequencies) to simulate trajectories.
+    
     tspan: A tuple representing the time span for the simulation, e.g., (0.0, 1000.0).
+    
     labels: Labels for the corners of the simplex. Default is ["Strategy 1", "Strategy 2", "Strategy 3"].
+    
     extra_params: A NamedTuple that can pass extra parameters to the payoff functions.
+    
     steady_state_tol: The tolerance level for determining when a trajectory reaches steady state.
+    
     arrow_list: A list of indices to draw arrows along the trajectory, useful for indicating direction of change.
+    
     trajectory_labels: Labels for each trajectory. Defaults to a numbered list.
-    trajectory_colors: Colors for each trajectory. If colored_trajectories is false, all trajectories will be black.
+    
+    trajectory_colors: Colors for each trajectory. If colored_trajectories is false (default), all trajectories will be black.
+    
     num_initial_guesses: Number of initial guesses to use when finding equilibria.
+    
     equilibria_tol: Tolerance for determining when a point is an equilibrium.
+    
     eq_size: The size of the marker for equilibrium points.
     colored_trajectories: Boolean flag indicating whether to color the trajectories or keep them black.
+
 
 ### Example 1: Basic Hawk-Dove Dynamics
 
