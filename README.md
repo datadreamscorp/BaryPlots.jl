@@ -84,8 +84,8 @@ plot_evolution(
     payoff_functions,
     initial_conditions,
     (0.0, 100.0),
-    labels=["Hawk", "Dove", "Loner"],
-    arrow_list = [[300], [400]]
+    labels = ["Hawk", "Dove", "Loner"],
+    arrow_list = [ [300], [400] ]
 )
 
 ```
@@ -126,7 +126,7 @@ In this example, we simulate the evolution of strategies in the Rock-Paper-Sciss
 	    initial_conditions,
 	    (0.0, 100.0),
 	    labels=["Rock", "Paper", "Scissors"],
-        arrow_list = [[100], [100]],
+        arrow_list = [ [100], [100] ],
 	    colored_trajectories = true
 	)
 
@@ -177,10 +177,10 @@ plot_evolution(
     payoff_funcs,
     initial_conditions,
     (0.0, 100.0);
-    labels=["Contribute", "Free Ride", "Loner"],
-    extra_params=params,
-    colored_trajectories=true,
-    arrow_list=[[200, 500], [200, 300]]
+    labels = ["Contribute", "Free Ride", "Loner"],
+    extra_params = params,
+    colored_trajectories = true,
+    arrow_list = [ [200, 500], [200, 300] ]
 )
 
 ```
