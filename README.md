@@ -89,12 +89,12 @@ using BaryPlots
 # Payoff functions for Hawk-Dove game
 function hd_payoff_H(x, t, params)
     H, D = x[1], x[2]
-    return 3 * H + 2 * D  # Payoff for Hawk
+    return (-1) * H + 4 * D  # Payoff for Hawk
 end
 
 function hd_payoff_D(x, t, params)
     H, D = x[1], x[2]
-    return 1 * H + 3 * D  # Payoff for Dove
+    return 0 * H + 2 * D  # Payoff for Dove
 end
 
 ```
@@ -203,7 +203,7 @@ function pg_payoff_dummy(x, t, params)
     return 0.0
 end
 
-# Set up the parameterized game with benefit multiplier b = 2.5
+# Set up the parameterized game with benefit multiplier b = 2.0
 params = (b = 2.0, )
 payoff_functions = (pg_payoff_C, pg_payoff_F, pg_payoff_dummy)
 
@@ -236,7 +236,7 @@ You can customize several aspects of the plot, including the colors of the traje
     trajectory_labels: Provide custom labels for the trajectories.
 
     trajectory_colors: Customize the colors of the trajectories.
-    
+
     colored_trajectories: Set this flag to true to have different colors for each trajectory, or keep it false for black trajectories.
 
 ### Equilibria and Stability
