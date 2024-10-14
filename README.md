@@ -26,7 +26,7 @@ or clone into the repository:
 
 BaryPlots focuses on simulating and visualizing the evolution of strategy frequencies over time in evolutionary games. The core of the package is the plot_evolution function, which allows you to simulate population dynamics under various payoff structures and plot the results in a visually clear format.
 
-#### `plot_evolution` Function
+#### The `plot_evolution` Function
 
 The `plot_evolution` function simulates and plots the evolution of strategy frequencies over time using replicator dynamics. This function is especially useful in evolutionary game theory to track how different strategies fare in a population.
 
