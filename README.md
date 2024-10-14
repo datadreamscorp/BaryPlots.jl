@@ -110,16 +110,16 @@ payoff_functions = (
     ) # Use a dummy function for the third "Loner" strategy
 
 initial_conditions = [
-    [0.35, 0.65, 0.0], 
-    [0.33, 0.67, 0.0]
-    ]  # Two starting points
+        [0.99, 0.01, 0.0], 
+        [0.01, 0.99, 0.0]
+        ]# Two starting points
 
 plot_evolution(
     payoff_functions,
     initial_conditions,
     (0.0, 100.0),
     labels = ["Hawk", "Dove", "Loner"],
-    arrow_list = [ [300], [600], ]
+    arrow_list = [ [300], [300], ]
 )
 
 ```
