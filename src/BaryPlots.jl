@@ -5,6 +5,7 @@ module BaryPlots
 	using LinearAlgebra
 	using NLsolve
 	using ForwardDiff
+    using PyPlot
 
     export plot_evolution, ternary_coords, replicator_dynamics!, check_stability, find_equilibria, plot_simplex, ReplicatorParams
 
@@ -122,6 +123,45 @@ This function is used to simulate the evolution of strategies over time.
         return DiscreteCallback(condition, affect!)
     end
 
+    function generate_simplex_grid(resolution::Int)
+        points = []
+        for i in 0:resolution
+            for j in 0:(resolution - i)
+                k = resolution - i - j
+                x1 = i / resolution
+                x2 = j / resolution
+                x3 = k / resolution
+                push!(points, [x1, x2, x3])
+            end
+        end
+        return points
+    end
+    
+    function compute_average_payoffs(grid_points::Vector{Vector{Float64}}, payoff_functions::Tuple{Function, Function, Function}, params::NamedTuple)
+        avg_payoffs = []
+        for x in grid_points
+            w1 = payoff_functions[1](x, 0.0, params)
+            w2 = payoff_functions[2](x, 0.0, params)
+            w3 = payoff_functions[3](x, 0.0, params)
+            avg_payoff = x[1]*w1 + x[2]*w2 + x[3]*w3
+            push!(avg_payoffs, avg_payoff)
+        end
+        return avg_payoffs
+    end
+    
+    function get_ternary_coordinates(grid_points::Vector{Vector{Float64}})
+        X = []
+        Y = []
+        for x in grid_points
+            X_i, Y_i = ternary_coords(x)
+            push!(X, X_i)
+            push!(Y, Y_i)
+        end
+        return X, Y
+    end
+    
+    
+
 """
     plot_evolution(
         payoff_functions::Tuple{Function, Function, Function},
@@ -134,7 +174,7 @@ This function is used to simulate the evolution of strategies over time.
         trajectory_labels::Vector{String} = String[],
         trajectory_colors::AbstractVector = Any[],
         num_initial_guesses::Int = 1000,
-        equilibria_tol::Float64 = 1e-6,
+        equilibrium_tol::Float64 = 1e-6,
         eq_size = 6,
         kwargs...
     ) -> Plots.Plot
@@ -153,7 +193,7 @@ a ternary simplex. It also computes and plots the equilibria of the system.
 - `trajectory_labels`: Labels for each trajectory (optional).
 - `trajectory_colors`: Colors for each trajectory (optional).
 - `num_initial_guesses`: Number of initial guesses for finding equilibria.
-- `equilibria_tol`: Tolerance for determining equilibria.
+- `equilibrium_tol`: Tolerance for determining equilibria.
 
 # Returns
 - A `Plot` object displaying the simplex with the trajectories and equilibria.
@@ -164,14 +204,20 @@ a ternary simplex. It also computes and plots the equilibria of the system.
         tspan::Tuple{Float64, Float64};
         labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"],
         extra_params::NamedTuple = NamedTuple(),
+        num_initial_guesses::Int = 1000,
         steady_state_tol::Float64 = 1e-6,
+        solver_tol::Float64 = 1e-8,
+        equilibrium_tol::Float64 = 1e-5,
+        validity_tol::Float64 = 1e-6,
+        stability_tol::Float64 = 1e-6,
         arrow_list::Vector{Vector{Int}} = Vector{Vector{Int}}(),
         trajectory_labels::Vector{String} = String[],
         trajectory_colors::AbstractVector = Any[],
-        num_initial_guesses::Int = 1000,
-        equilibria_tol::Float64 = 1e-8,
-        eq_size = 6,
-        colored_trajectories = false,
+        equilibrium_size::Int = 6,
+        colored_trajectories::Bool = false,
+        contourf::Bool = false,
+        contour_resolution::Int = 50,
+        contour_levels::Int = 10,
         kwargs...
     )
         num_trajectories = length(x0_list)
@@ -202,7 +248,10 @@ a ternary simplex. It also computes and plots the equilibria of the system.
             payoff_functions, 
             extra_params,
             num_initial_guesses = num_initial_guesses,
-            tol = equilibria_tol
+            solver_tol = solver_tol,
+            equilibrium_tol = equilibrium_tol,
+            validity_tol = validity_tol,
+            stability_tol = stability_tol
         )
     
         for i in 1:num_trajectories
@@ -272,7 +321,7 @@ a ternary simplex. It also computes and plots the equilibria of the system.
                     scatter!([X_eq], [Y_eq];
                         markercolor = :black,
                         markershape = :circle,
-                        markersize = eq_size,
+                        markersize = equilibrium_size,
                         label = false)
                 else
                     # Plot unstable equilibrium as hollow circle
@@ -280,7 +329,7 @@ a ternary simplex. It also computes and plots the equilibria of the system.
                         markercolor = :white,
                         markerstrokecolor = :black,
                         markershape = :circle,
-                        markersize = eq_size,
+                        markersize = equilibrium_size,
                         label = false)
                 end
             end
@@ -306,9 +355,11 @@ a ternary simplex. It also computes and plots the equilibria of the system.
         return dx
     end
 
-    function equilibrium_exists(x_new, equilibria, tol)
+    function equilibrium_exists(x_new, equilibria, equilibrium_tol)
+        x_new /= sum(x_new)
         for x_eq in equilibria
-            if norm(x_new - x_eq) < tol
+            x_eq /= sum(x_eq)
+            if norm(x_new - x_eq) < equilibrium_tol
                 return true
             end
         end
@@ -329,7 +380,7 @@ the equilibrium is stable.
 # Returns
 - `true` if the equilibrium is stable, `false` otherwise.
 """
-    function check_stability(x_eq, params::ReplicatorParams)
+    function check_stability(x_eq, params::ReplicatorParams; stability_tol::Float64 = 1e-6)
         # Reduced dynamics function
         function reduced_replicator(x_reduced)
             x1, x2 = x_reduced
@@ -345,17 +396,15 @@ the equilibrium is stable.
     
         # Compute eigenvalues
         eigenvalues = eigvals(J_reduced)
-        println("Eigenvalues at equilibrium $x_eq: $eigenvalues")
-
-        tolerance = 1e-6
+        #println("Eigenvalues at equilibrium $x_eq: $eigenvalues")
 
         # If the real parts are all near zero (neutrally stable or oscillatory), return false
-        if all(abs(real(eigenvalue)) < tolerance for eigenvalue in eigenvalues)
+        if all(abs(real(eigenvalue)) < stability_tol for eigenvalue in eigenvalues)
             return false
         end
 
         # Otherwise, check if all real parts are strictly negative for stability
-        return all(real(eigenvalues) .< -tolerance)
+        return all(real(eigenvalues) .< -stability_tol)
     end
 
 """
@@ -384,7 +433,10 @@ the strategy frequencies stop changing. It also checks the stability of each equ
         payoff_functions::Tuple{Function, Function, Function},
         params::NamedTuple;
         num_initial_guesses::Int = 1000,
-        tol::Float64 = 1e-8
+        solver_tol::Float64 = 1e-8,
+        equilibrium_tol::Float64 = 1e-5,
+        validity_tol::Float64 = 1e-6,
+        stability_tol::Float64 = 1e-6
     )
         equilibria = Vector{Vector{Float64}}()
         stability_status = Vector{Bool}()
@@ -403,7 +455,7 @@ the strategy frequencies stop changing. It also checks the stability of each equ
     
             # Use nlsolve to find the root
             result = try
-                nlsolve(f, x0; method = :trust_region, xtol = tol)
+                nlsolve(f, x0; method = :trust_region, xtol = solver_tol)
             catch
                 # If solver fails, skip this initial guess
                 continue
@@ -416,12 +468,12 @@ the strategy frequencies stop changing. It also checks the stability of each equ
             x_eq /= sum(x_eq)
     
             # Check if the solution is within the simplex and valid
-            if all(x_eq .>= -tol) && all(x_eq .<= 1 + tol)
+            if all(x_eq .>= -validity_tol) && all(x_eq .<= 1 + validity_tol)
                 # Check if this equilibrium is already found
-                if !equilibrium_exists(x_eq, equilibria, tol)
+                if !equilibrium_exists(x_eq, equilibria, equilibrium_tol)
                     push!(equilibria, x_eq)
                     # Determine stability
-                    is_stable = check_stability(x_eq, replicator_params)
+                    is_stable = check_stability(x_eq, replicator_params, stability_tol=stability_tol)
                     push!(stability_status, is_stable)
                 end
             end
