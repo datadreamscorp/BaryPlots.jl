@@ -44,8 +44,8 @@ plot_evolution(
     trajectory_colors::AbstractVector = Any[],
     num_initial_guesses::Int = 1000,
     equilibria_tol::Float64 = 1e-6,
-    eq_size = 6,
-    colored_trajectories = false,
+    eq_size::Int = 6,
+    colored_trajectories::Bool = false,
     kwargs...
 ) -> Plots.Plot
 
