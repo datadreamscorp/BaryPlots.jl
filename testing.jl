@@ -84,7 +84,8 @@ plot_evolution(
 	solver_tol = 1e-10,
 	stability_tol = 1e-3,
 	validity_tol = 1e-8,
-	equilibrium_tol = 1e-2
+	equilibrium_tol = 1e-2,
+	contourf = true
 )
 
 # ╔═╡ 0d778e28-f271-4a49-abbf-75a12406fcd0
@@ -113,7 +114,7 @@ plot(trap, xlim=(-1, 2), legend=false, lw=2)
 # ╠═130a4a1c-f671-4bd0-ad52-fa51e6ef6f8a
 # ╠═79b33ae9-9ff8-429c-9839-94320d407925
 # ╠═d3a0748c-020f-4d63-baf7-cbcd93276180
-# ╟─8363150f-249e-4637-9cdd-a9624e911f9f
-# ╟─17c8cf6b-11f4-412d-83e4-b55e65f429eb
+# ╠═8363150f-249e-4637-9cdd-a9624e911f9f
+# ╠═17c8cf6b-11f4-412d-83e4-b55e65f429eb
 # ╠═0d778e28-f271-4a49-abbf-75a12406fcd0
 # ╠═6f6a2638-4efa-4867-be2d-52cca33fdf3d

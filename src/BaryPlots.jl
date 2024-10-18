@@ -5,7 +5,6 @@ module BaryPlots
 	using LinearAlgebra
 	using NLsolve
 	using ForwardDiff
-    using PyPlot
 
     export plot_evolution, ternary_coords, replicator_dynamics!, check_stability, find_equilibria, plot_simplex, ReplicatorParams
 
@@ -124,7 +123,8 @@ This function is used to simulate the evolution of strategies over time.
     end
 
     function generate_simplex_grid(resolution::Int)
-        points = []
+        points = Vector{Vector{Float64}}()
+
         for i in 0:resolution
             for j in 0:(resolution - i)
                 k = resolution - i - j
@@ -204,24 +204,25 @@ a ternary simplex. It also computes and plots the equilibria of the system.
         tspan::Tuple{Float64, Float64};
         labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"],
         extra_params::NamedTuple = NamedTuple(),
-        num_initial_guesses::Int = 1000,
         steady_state_tol::Float64 = 1e-6,
+        arrow_list::Vector{Vector{Int}} = Vector{Vector{Int}}(),
+        trajectory_labels::Vector{String} = String[],
+        trajectory_colors::AbstractVector = Any[],
+        num_initial_guesses::Int = 1000,
         solver_tol::Float64 = 1e-8,
         equilibrium_tol::Float64 = 1e-5,
         validity_tol::Float64 = 1e-6,
         stability_tol::Float64 = 1e-6,
-        arrow_list::Vector{Vector{Int}} = Vector{Vector{Int}}(),
-        trajectory_labels::Vector{String} = String[],
-        trajectory_colors::AbstractVector = Any[],
-        equilibrium_size::Int = 6,
-        colored_trajectories::Bool = false,
+        eq_size = 6,
+        colored_trajectories = false,
         contourf::Bool = false,
-        contour_resolution::Int = 50,
+        contour_resolution::Int = 100,
         contour_levels::Int = 10,
-        kwargs...
-    )
+        cbar::Bool = false,
+        legend::Bool = false,
+    )::Plots.Plot
         num_trajectories = length(x0_list)
-    
+
         # Default labels and colors if not provided
         if isempty(trajectory_labels)
             trajectory_labels = ["Trajectory $(i)" for i in 1:num_trajectories]
@@ -233,16 +234,13 @@ a ternary simplex. It also computes and plots the equilibria of the system.
                 for i in 1:num_trajectories
                 ] : repeat(["black"], num_trajectories)
         end
-    
+
         # Prepare the parameters
         params = ReplicatorParams(payoff_functions, extra_params)
-    
+
         # Create the steady state callback
         cb = create_steady_state_callback(steady_state_tol)
-    
-        # Plotting
-        plot_simplex(labels = labels)
-    
+
         # Compute equilibria
         equilibria, stability_status = find_equilibria(
             payoff_functions, 
@@ -253,15 +251,58 @@ a ternary simplex. It also computes and plots the equilibria of the system.
             validity_tol = validity_tol,
             stability_tol = stability_tol
         )
-    
+
+        # Start plotting
+        if contourf
+            # Generate the simplex grid
+            grid_points = generate_simplex_grid(contour_resolution)
+            X_coords, Y_coords = get_ternary_coordinates(grid_points)
+            Z_values = compute_average_payoffs(grid_points, payoff_functions, extra_params)
+
+            # Convert lists to arrays
+            X_coords = collect(X_coords)
+            Y_coords = collect(Y_coords)
+            Z_values = collect(Z_values)
+
+            # Create the contour plot using scatter with color mapping
+            p = scatter(X_coords, Y_coords;
+                zcolor = Z_values,
+                markersize = 5,
+                markerstrokewidth = 0,
+                colorbar = cbar,
+                legend = false,
+                xlabel = "",
+                ylabel = "",
+                xlims = (-0.1, 1.1),
+                ylims = (-0.1, sqrt(3)/2 + 0.1),
+                aspect_ratio = 1,
+                framestyle = :none,
+                c = :viridis)
+
+            # Plot the simplex boundaries
+            triangle_x = [0.0, 1.0, 0.5, 0.0]
+            triangle_y = [0.0, 0.0, sqrt(3)/2, 0.0]
+            plot!(p, triangle_x, triangle_y, color=:black, linewidth=1, legend=false)
+
+            # Add labels
+            annotate!(p, 0.0, -0.05, text(labels[2], :center))  # Left corner
+            annotate!(p, 1.0, -0.05, text(labels[1], :center))  # Right corner
+            annotate!(p, 0.5, sqrt(3)/2 + 0.05, text(labels[3], :center)) # Top corner
+
+        else
+            # Existing code to plot the simplex without contour
+            p = plot_simplex(labels = labels)
+        end
+
+        # Plotting trajectories
         for i in 1:num_trajectories
             x0 = x0_list[i] / sum(x0_list[i])  # Ensure x0 sums to 1
             prob = ODEProblem(replicator_dynamics!, x0, tspan, params)
             sol = solve(prob; callback = cb,
                         saveat = tspan[1]:0.01:tspan[2], tstops = [tspan[2]],
-                        reltol = 1e-8, abstol = 1e-8, kwargs...,
+                        reltol = 1e-8, abstol = 1e-8,
                         isoutofdomain = (u,p,t) -> any(x -> x < -1e-8 || x > 1+1e-8, u))
-    
+
             # Extract the solutions
             X = Float64[]
             Y = Float64[]
@@ -270,30 +311,30 @@ a ternary simplex. It also computes and plots the equilibria of the system.
                 push!(X, coord[1])
                 push!(Y, coord[2])
             end
-    
+
             # Plot trajectory
-            plot!(X, Y;
+            plot!(p, X, Y;
                 linecolor = trajectory_colors[i],
+                legend = legend,
                 label = trajectory_labels[i])
-    
+
             # Add arrows along the trajectory if requested
             if length(arrow_list) ≥ i && !isempty(arrow_list[i])
                 arrow_scale = 0.01  # Adjust this value to change arrow size
-                for j in arrow_list[i] #1:arrow_interval:(length(X)-1)
-                    if j > 0
+                for j in arrow_list[i]
+                    if j > 0 && j < length(X)
                         x_start, y_start = X[j], Y[j]
                         x_end, y_end = X[j+1], Y[j+1]
                         dx_arrow = x_end - x_start
                         dy_arrow = y_end - y_start
-                        # Normalize the direction vector for consistent arrow size
                         norm_factor = sqrt(dx_arrow^2 + dy_arrow^2)
-                        if norm_factor != 0  # Avoid division by zero
+                        if norm_factor != 0
                             dx_arrow /= norm_factor
                             dy_arrow /= norm_factor
-                            # Scale the arrow size
                             dx_arrow *= arrow_scale
                             dy_arrow *= arrow_scale
                             quiver!(
+                                p,
                                 [x_start], 
                                 [y_start], 
                                 quiver=(
@@ -305,9 +346,8 @@ a ternary simplex. It also computes and plots the equilibria of the system.
                     end
                 end
             end
-    
         end
-    
+
         # Plot the equilibria
         if !isempty(equilibria)
             for (i, x_eq) in enumerate(equilibria)
@@ -315,29 +355,36 @@ a ternary simplex. It also computes and plots the equilibria of the system.
                 # Ensure the equilibrium point sums to 1
                 x_eq = x_eq / sum(x_eq)
                 X_eq, Y_eq = ternary_coords(x_eq)
-    
+
                 if is_stable
                     # Plot stable equilibrium as filled black circle
-                    scatter!([X_eq], [Y_eq];
+                    scatter!(p, [X_eq], [Y_eq];
                         markercolor = :black,
                         markershape = :circle,
-                        markersize = equilibrium_size,
+                        markersize = eq_size,
                         label = false)
                 else
                     # Plot unstable equilibrium as hollow circle
-                    scatter!([X_eq], [Y_eq];
+                    scatter!(p, [X_eq], [Y_eq];
                         markercolor = :white,
                         markerstrokecolor = :black,
                         markershape = :circle,
-                        markersize = equilibrium_size,
+                        markersize = eq_size,
                         label = false)
                 end
             end
         end
-    
-        # Show legend
-        plot!(legend = false)
+
+        # Show legend if trajectories are labeled
+        if any(.!isempty.(trajectory_labels))
+            plot!(p, legend = legend)
+        else
+            plot!(p, legend = false)
+        end
+
+        return p
     end
+
 
     function generate_initial_guesses(n)
         guesses = []
