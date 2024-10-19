@@ -11,15 +11,18 @@ module BaryPlots
 """
     ternary_coords(x::Vector{Float64}) -> Tuple{Float64, Float64}
 
-Transforms a vector `x` of three strategy frequencies `[x1, x2, x3]` into ternary coordinates
-for plotting within a simplex. It ensures that the sum of the frequencies equals 1 and returns
-the transformed coordinates `(X, Y)`.
+Converts a vector `x` of three strategy frequencies `[x₁, x₂, x₃]` into ternary coordinates `(X, Y)`
+for plotting within a simplex (equilateral triangle).
 
 # Arguments
-- `x`: A vector of length 3, representing the frequencies of three strategies.
+- `x`: A vector of length 3, representing the frequencies of three strategies. The frequencies can sum to any positive value; they will be normalized within the function.
 
 # Returns
 - A tuple `(X, Y)` representing the ternary coordinates of the input vector.
+
+# Notes
+- This function ensures that the sum of the frequencies equals 1 by normalizing `x`.
+- The ternary coordinates are calculated based on the normalized frequencies for plotting in a 2D simplex.
 """
     function ternary_coords(x)
         x1, x2, x3 = x  # Strategy frequencies
@@ -36,14 +39,17 @@ the transformed coordinates `(X, Y)`.
 """
     plot_simplex(; labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"], kwargs...) -> Plots.Plot
 
-Plots the simplex for three strategies, using a triangular shape, and adds labels for the
-corners of the simplex. This is used as a background for plotting evolutionary dynamics.
+Plots an equilateral triangle representing the simplex for three strategies. Labels are added to the corners of the triangle.
 
 # Arguments
-- `labels`: A vector of three strings, which label the corners of the simplex. Default: `["Strategy 1", "Strategy 2", "Strategy 3"]`.
+- `labels`: A vector of three strings that label the corners of the simplex. Default: `["Strategy 1", "Strategy 2", "Strategy 3"]`.
+- `kwargs`: Additional keyword arguments passed to the `plot` function.
 
 # Returns
 - A `Plot` object displaying the simplex triangle with the specified labels.
+
+# Notes
+- This function sets up the simplex plot, which can be used as a background for plotting evolutionary dynamics.
 """
     function plot_simplex(; labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"], kwargs...)
         triangle_x = [0.0, 1.0, 0.5, 0.0]
@@ -51,6 +57,7 @@ corners of the simplex. This is used as a background for plotting evolutionary d
         plot(triangle_x, triangle_y;
             seriestype = :shape,
             aspect_ratio = 1,
+            linewidth = 2,
             fillcolor = :white,
             linecolor = :black,
             legend = false,
@@ -67,6 +74,15 @@ corners of the simplex. This is used as a background for plotting evolutionary d
         annotate!(0.5, sqrt(3)/2 + 0.05, text(labels[3], :center)) # Top corner (Hoarder)
     end
 
+"""
+    struct ReplicatorParams
+
+Holds parameters for the replicator dynamics, including payoff functions and extra parameters.
+
+# Fields
+- `payoff_functions`: A tuple of three payoff functions `(payoff1, payoff2, payoff3)`, one for each strategy.
+- `extra_params`: A `NamedTuple` containing additional parameters required by the payoff functions.
+"""
     struct ReplicatorParams
         
         payoff_functions::Tuple{Function, Function, Function}  # Payoff functions for strategies
@@ -76,8 +92,7 @@ corners of the simplex. This is used as a background for plotting evolutionary d
 """
     replicator_dynamics!(dx::Vector{Float64}, x::Vector{Float64}, params::ReplicatorParams, t::Float64)
 
-Computes the time derivative of the replicator dynamics for a population playing three
-strategies. The payoffs for each strategy are passed as part of `ReplicatorParams`.
+Computes the time derivative of the replicator dynamics for a population playing three strategies.
 
 # Arguments
 - `dx`: A vector to store the time derivative (change in frequencies).
@@ -86,7 +101,8 @@ strategies. The payoffs for each strategy are passed as part of `ReplicatorParam
 - `t`: The current time in the dynamics.
 
 # Notes
-This function is used to simulate the evolution of strategies over time.
+- The function normalizes `x` to ensure the frequencies sum to 1 before computing the payoffs.
+- The replicator dynamics equation is: `dxᵢ = xᵢ * (wᵢ - w̄)`, where `wᵢ` is the payoff of strategy `i` and `w̄` is the average payoff.
 """
     function replicator_dynamics!(dx, x, params::ReplicatorParams, t)
         # Normalize the frequencies to ensure they sum to 1
@@ -110,6 +126,20 @@ This function is used to simulate the evolution of strategies over time.
         dx .= x_normalized .* (payoffs .- avg_payoff)
     end
 
+"""
+    create_steady_state_callback(steady_state_tol::Float64) -> DiscreteCallback
+
+Creates a callback function for use with DifferentialEquations.jl solvers that terminates the integration when the system reaches a steady state.
+
+# Arguments
+- `steady_state_tol`: Tolerance for determining when the system has reached a steady state (i.e., when the norm of the derivative is below this value).
+
+# Returns
+- A `DiscreteCallback` object that can be passed to the solver.
+
+# Notes
+- The callback checks if the norm of the derivative is less than `steady_state_tol` and terminates the integration if so.
+"""
     function create_steady_state_callback(steady_state_tol)
         condition(u, t, integrator) = begin
             # Re-evaluate the derivative at the current state
@@ -122,21 +152,54 @@ This function is used to simulate the evolution of strategies over time.
         return DiscreteCallback(condition, affect!)
     end
 
-    function generate_simplex_grid(resolution::Int)
-        points = Vector{Vector{Float64}}()
+"""
+    generate_simplex_grid(resolution::Int, margin::Int = 1) -> Vector{Vector{Float64}}
 
-        for i in 0:resolution
-            for j in 0:(resolution - i)
+Generates a list of points within the simplex by discretizing the simplex into a grid, excluding points near the boundaries as specified by the margin.
+
+# Arguments
+- `resolution`: The number of divisions along each edge of the simplex. Higher resolution results in more points.
+- `margin`: The number of grid layers to exclude from the edges. Defaults to 1.
+
+# Returns
+- A vector of points, where each point is a vector `[x₁, x₂, x₃]` representing the frequencies of the three strategies at that grid point.
+
+# Notes
+- This function is used to generate points for plotting contour plots within the simplex.
+"""
+    function generate_simplex_grid(resolution::Int, margin::Int = 1)
+        points = Vector{Vector{Float64}}()
+        for i in margin:(resolution - margin)
+            for j in margin:(resolution - i - margin)
                 k = resolution - i - j
-                x1 = i / resolution
-                x2 = j / resolution
-                x3 = k / resolution
-                push!(points, [x1, x2, x3])
+                if k ≥ margin
+                    x1 = i / resolution
+                    x2 = j / resolution
+                    x3 = k / resolution
+                    x = [x1, x2, x3]
+                    push!(points, x)
+                end
             end
         end
         return points
     end
     
+"""
+    compute_average_payoffs(grid_points::Vector{Vector{Float64}}, payoff_functions::Tuple{Function, Function, Function}, params::NamedTuple) -> Vector{Float64}
+
+Computes the average payoff for each point in `grid_points` given the payoff functions and additional parameters.
+
+# Arguments
+- `grid_points`: A vector of points, where each point is a vector `[x₁, x₂, x₃]` representing the frequencies of the three strategies.
+- `payoff_functions`: A tuple of three payoff functions corresponding to each strategy.
+- `params`: A `NamedTuple` of additional parameters required by the payoff functions.
+
+# Returns
+- A vector of average payoffs corresponding to each point in `grid_points`.
+
+# Notes
+- The average payoff at each point is calculated as `avg_payoff = x₁*w₁ + x₂*w₂ + x₃*w₃`, where `wᵢ` is the payoff of strategy `i`.
+"""
     function compute_average_payoffs(grid_points::Vector{Vector{Float64}}, payoff_functions::Tuple{Function, Function, Function}, params::NamedTuple)
         avg_payoffs = []
         for x in grid_points
@@ -149,6 +212,20 @@ This function is used to simulate the evolution of strategies over time.
         return avg_payoffs
     end
     
+"""
+    get_ternary_coordinates(grid_points::Vector{Vector{Float64}}) -> Tuple{Vector{Float64}, Vector{Float64}}
+
+Converts a list of points in strategy frequency space to their corresponding ternary plot coordinates.
+
+# Arguments
+- `grid_points`: A vector of points, where each point is a vector `[x₁, x₂, x₃]` representing the frequencies of the three strategies.
+
+# Returns
+- A tuple `(X_coords, Y_coords)`, where `X_coords` and `Y_coords` are vectors containing the ternary plot coordinates for each point.
+
+# Notes
+- Uses `ternary_coords` to compute the coordinates for each point.
+"""
     function get_ternary_coordinates(grid_points::Vector{Vector{Float64}})
         X = []
         Y = []
@@ -173,14 +250,25 @@ This function is used to simulate the evolution of strategies over time.
         arrow_list::Vector{Vector{Int}} = Vector{Vector{Int}}(),
         trajectory_labels::Vector{String} = String[],
         trajectory_colors::AbstractVector = Any[],
+        trajectory_linewidth::Int = 2,
         num_initial_guesses::Int = 1000,
-        equilibrium_tol::Float64 = 1e-6,
-        eq_size = 6,
-        kwargs...
-    ) -> Plots.Plot
+        solver_tol::Float64 = 1e-8,
+        equilibrium_tol::Float64 = 1e-5,
+        validity_tol::Float64 = 1e-6,
+        stability_tol::Float64 = 1e-6,
+        eq_size::Int = 7,
+        colored_trajectories::Bool = false,
+        contourf::Bool = false,
+        contour_resolution::Int = 150,
+        contour_levels::Int = 10,
+        cbar::Bool = false,
+        triangle_linewidth::Int = 2,
+        legend::Bool = false,
+        margin::Int = 2,
+        dpi = 300,
+    )::Plots.Plot
 
-Simulates the evolution of strategy frequencies over time and plots their trajectories within
-a ternary simplex. It also computes and plots the equilibria of the system.
+Simulates the evolution of strategy frequencies over time and plots their trajectories within a ternary simplex. It also computes and plots the equilibria of the system and optionally overlays a contour plot.
 
 # Arguments
 - `payoff_functions`: A tuple of three payoff functions corresponding to each strategy.
@@ -192,11 +280,30 @@ a ternary simplex. It also computes and plots the equilibria of the system.
 - `arrow_list`: A list of indices indicating where to draw arrows along the trajectories.
 - `trajectory_labels`: Labels for each trajectory (optional).
 - `trajectory_colors`: Colors for each trajectory (optional).
+- `trajectory_linewidth`: Line width for the trajectory lines.
 - `num_initial_guesses`: Number of initial guesses for finding equilibria.
-- `equilibrium_tol`: Tolerance for determining equilibria.
+- `solver_tol`: Tolerance for the numerical solver when finding equilibria.
+- `equilibrium_tol`: Tolerance for determining equilibria uniqueness.
+- `validity_tol`: Tolerance for validating equilibrium points within the simplex.
+- `stability_tol`: Tolerance for stability analysis of equilibria.
+- `eq_size`: Size of the markers representing equilibria.
+- `colored_trajectories`: Whether to color trajectories differently.
+- `contourf`: Whether to include a contour plot of average payoffs.
+- `contour_resolution`: Resolution of the contour plot grid.
+- `contour_levels`: Number of contour levels.
+- `cbar`: Whether to include a color bar in the contour plot.
+- `triangle_linewidth`: Line width for the simplex triangle.
+- `legend`: Whether to include a legend.
+- `margin`: Margin to exclude points near the boundaries in the contour plot.
+- `dpi`: Dots per inch for the plot resolution.
 
 # Returns
 - A `Plot` object displaying the simplex with the trajectories and equilibria.
+
+# Notes
+- Trajectories are simulated using the replicator dynamics defined by the provided payoff functions.
+- Equilibria are computed numerically and their stability is assessed.
+- If `contourf` is `true`, a contour plot of average payoffs is overlaid on the simplex.
 """
     function plot_evolution(
         payoff_functions::Tuple{Function, Function, Function},
@@ -208,19 +315,24 @@ a ternary simplex. It also computes and plots the equilibria of the system.
         arrow_list::Vector{Vector{Int}} = Vector{Vector{Int}}(),
         trajectory_labels::Vector{String} = String[],
         trajectory_colors::AbstractVector = Any[],
+        trajectory_linewidth::Int = 2,
         num_initial_guesses::Int = 1000,
         solver_tol::Float64 = 1e-8,
         equilibrium_tol::Float64 = 1e-5,
         validity_tol::Float64 = 1e-6,
         stability_tol::Float64 = 1e-6,
-        eq_size = 6,
-        colored_trajectories = false,
+        eq_size::Int = 7,
+        colored_trajectories::Bool = false,
         contourf::Bool = false,
-        contour_resolution::Int = 100,
+        contour_resolution::Int = 150,
         contour_levels::Int = 10,
         cbar::Bool = false,
+        triangle_linewidth::Int = 2,
         legend::Bool = false,
+        margin::Int = 2,
+        dpi = 300,
     )::Plots.Plot
+
         num_trajectories = length(x0_list)
 
         # Default labels and colors if not provided
@@ -254,16 +366,11 @@ a ternary simplex. It also computes and plots the equilibria of the system.
 
         # Start plotting
         if contourf
-            # Generate the simplex grid
-            grid_points = generate_simplex_grid(contour_resolution)
+            # Generate the simplex grid without boundary points
+            grid_points = generate_simplex_grid(contour_resolution, margin)
             X_coords, Y_coords = get_ternary_coordinates(grid_points)
             Z_values = compute_average_payoffs(grid_points, payoff_functions, extra_params)
-
-            # Convert lists to arrays
-            X_coords = collect(X_coords)
-            Y_coords = collect(Y_coords)
-            Z_values = collect(Z_values)
-
+    
             # Create the contour plot using scatter with color mapping
             p = scatter(X_coords, Y_coords;
                 zcolor = Z_values,
@@ -277,21 +384,21 @@ a ternary simplex. It also computes and plots the equilibria of the system.
                 ylims = (-0.1, sqrt(3)/2 + 0.1),
                 aspect_ratio = 1,
                 framestyle = :none,
-                c = :viridis)
-
+                c = :viridis,
+                dpi = dpi)
+    
             # Plot the simplex boundaries
             triangle_x = [0.0, 1.0, 0.5, 0.0]
             triangle_y = [0.0, 0.0, sqrt(3)/2, 0.0]
-            plot!(p, triangle_x, triangle_y, color=:black, linewidth=1, legend=false)
-
+            plot!(p, triangle_x, triangle_y, color=:black, linewidth=triangle_linewidth, legend=false)
+    
             # Add labels
-            annotate!(p, 0.0, -0.05, text(labels[2], :center))  # Left corner
-            annotate!(p, 1.0, -0.05, text(labels[1], :center))  # Right corner
-            annotate!(p, 0.5, sqrt(3)/2 + 0.05, text(labels[3], :center)) # Top corner
-
+            annotate!(p, 0.0, -0.05, text(labels[2], :center))
+            annotate!(p, 1.0, -0.05, text(labels[1], :center))
+            annotate!(p, 0.5, sqrt(3)/2 + 0.05, text(labels[3], :center))
         else
             # Existing code to plot the simplex without contour
-            p = plot_simplex(labels = labels)
+            p = plot_simplex(labels = labels, linewidth=triangle_linewidth)
         end
 
         # Plotting trajectories
@@ -313,10 +420,13 @@ a ternary simplex. It also computes and plots the equilibria of the system.
             end
 
             # Plot trajectory
-            plot!(p, X, Y;
+            plot!(
+                p, X, Y;
                 linecolor = trajectory_colors[i],
                 legend = legend,
-                label = trajectory_labels[i])
+                label = trajectory_labels[i],
+                linewidth = trajectory_linewidth,
+                )
 
             # Add arrows along the trajectory if requested
             if length(arrow_list) ≥ i && !isempty(arrow_list[i])
@@ -340,7 +450,7 @@ a ternary simplex. It also computes and plots the equilibria of the system.
                                 quiver=(
                                     [dx_arrow], [dy_arrow]);
                                     arrow=:closed, color=trajectory_colors[i],
-                                    linewidth=1, label=false
+                                    linewidth=trajectory_linewidth, label=false
                             )
                         end
                     end
@@ -379,13 +489,26 @@ a ternary simplex. It also computes and plots the equilibria of the system.
         if any(.!isempty.(trajectory_labels))
             plot!(p, legend = legend)
         else
-            plot!(p, legend = false)
+            plot!(p, legend = legend)
         end
 
         return p
     end
 
+"""
+    generate_initial_guesses(n::Int) -> Vector{Vector{Float64}}
 
+Generates random initial guesses within the simplex for finding equilibria.
+
+# Arguments
+- `n`: The number of initial guesses to generate.
+
+# Returns
+- A vector of vectors, each representing a point `[x₁, x₂, x₃]` within the simplex (summing to 1).
+
+# Notes
+- The generated points are uniformly random within the simplex.
+"""
     function generate_initial_guesses(n)
         guesses = []
         for _ in 1:n
@@ -396,12 +519,44 @@ a ternary simplex. It also computes and plots the equilibria of the system.
         return guesses
     end
 
+"""
+    replicator_equation(x::Vector{Float64}, params::ReplicatorParams, t::Float64) -> Vector{Float64}
+
+Computes the replicator dynamics equation at a given point.
+
+# Arguments
+- `x`: A vector representing the strategy frequencies.
+- `params`: A `ReplicatorParams` struct containing the payoff functions and extra parameters.
+- `t`: The current time.
+
+# Returns
+- A vector `dx` representing the time derivatives of the strategy frequencies.
+
+# Notes
+- This function is used in numerical root-finding to find equilibria.
+"""
     function replicator_equation(x, params::ReplicatorParams, t)
         dx = similar(x)
         replicator_dynamics!(dx, x, params, t)
         return dx
     end
 
+"""
+    equilibrium_exists(x_new::Vector{Float64}, equilibria::Vector{Vector{Float64}}, equilibrium_tol::Float64) -> Bool
+
+Checks if a newly found equilibrium already exists in the list of equilibria.
+
+# Arguments
+- `x_new`: The new equilibrium point to check.
+- `equilibria`: A vector of existing equilibria.
+- `equilibrium_tol`: Tolerance for considering two equilibria as the same.
+
+# Returns
+- `true` if the equilibrium already exists, `false` otherwise.
+
+# Notes
+- Normalizes `x_new` and existing equilibria to sum to 1 before comparison.
+"""
     function equilibrium_exists(x_new, equilibria, equilibrium_tol)
         x_new /= sum(x_new)
         for x_eq in equilibria
@@ -414,18 +569,21 @@ a ternary simplex. It also computes and plots the equilibria of the system.
     end
 
 """
-    check_stability(x_eq::Vector{Float64}, params::ReplicatorParams) -> Bool
+    check_stability(x_eq::Vector{Float64}, params::ReplicatorParams; stability_tol::Float64 = 1e-6) -> Bool
 
-Checks the stability of an equilibrium point by computing the Jacobian matrix of the reduced
-system and checking the signs of its eigenvalues. If all eigenvalues have negative real parts,
-the equilibrium is stable.
+Determines the stability of an equilibrium point by analyzing the eigenvalues of the Jacobian matrix of the reduced system.
 
 # Arguments
 - `x_eq`: A vector representing the strategy frequencies at the equilibrium point.
 - `params`: A `ReplicatorParams` struct containing the payoff functions and extra parameters.
+- `stability_tol`: Tolerance for determining the stability based on eigenvalues.
 
 # Returns
 - `true` if the equilibrium is stable, `false` otherwise.
+
+# Notes
+- The reduced system excludes one variable due to the simplex constraint (sum to 1).
+- Stability is determined by the sign of the real parts of the eigenvalues.
 """
     function check_stability(x_eq, params::ReplicatorParams; stability_tol::Float64 = 1e-6)
         # Reduced dynamics function
@@ -459,22 +617,31 @@ the equilibrium is stable.
         payoff_functions::Tuple{Function, Function, Function},
         params::NamedTuple;
         num_initial_guesses::Int = 1000,
-        tol::Float64 = 1e-6
+        solver_tol::Float64 = 1e-8,
+        equilibrium_tol::Float64 = 1e-5,
+        validity_tol::Float64 = 1e-6,
+        stability_tol::Float64 = 1e-6
     ) -> Tuple{Vector{Vector{Float64}}, Vector{Bool}}
 
-Finds the equilibria of the replicator dynamics system by numerically solving for points where
-the strategy frequencies stop changing. It also checks the stability of each equilibrium.
+Finds the equilibria of the replicator dynamics system by numerically solving for points where the strategy frequencies stop changing.
 
 # Arguments
 - `payoff_functions`: A tuple of three payoff functions corresponding to each strategy.
 - `params`: Extra parameters for the payoff functions (optional).
 - `num_initial_guesses`: Number of initial guesses to use for finding equilibria.
-- `tol`: Tolerance for determining equilibria.
+- `solver_tol`: Tolerance for the numerical solver.
+- `equilibrium_tol`: Tolerance for considering equilibria as unique.
+- `validity_tol`: Tolerance for validating equilibria within the simplex.
+- `stability_tol`: Tolerance for stability analysis.
 
 # Returns
 - A tuple containing:
     - `equilibria`: A vector of strategy frequencies representing the equilibria.
     - `stability_status`: A vector of booleans indicating whether each equilibrium is stable.
+
+# Notes
+- Uses `nlsolve` to find roots of the replicator equation.
+- Filters out equilibria that are outside the simplex or are duplicates.
 """
     function find_equilibria(
         payoff_functions::Tuple{Function, Function, Function},

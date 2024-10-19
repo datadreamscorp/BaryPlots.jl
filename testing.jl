@@ -73,14 +73,24 @@ plot(f, xlim=(1, 10), legend=false, lw=2)
 plot_evolution(
     payoff_functions,
     [
-		[0.0, 0.01, 0.99],
-    	[0.99, 0.01, 0.0],
-		[0.99, 0.0, 0.01],
-		[0.1, 0.05, 0.85]
+		[0.0, 0.5, 0.5],
+    	[0.5, 0.5, 0.0],
+		[0.925, 0.0, 0.075],
+		[0.5, 0.0, 0.5],
+		[0.5, 0.4, 0.1],
+		[0.6, 0.4, 0.15]
 	],
     tspan;
     labels = labels,
     extra_params = params,
+	arrow_list = [
+		[1],
+		[1],
+		[1],
+		[1],
+		[1000],
+		[1000],
+	],
 	solver_tol = 1e-10,
 	stability_tol = 1e-3,
 	validity_tol = 1e-8,
