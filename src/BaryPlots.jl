@@ -330,7 +330,7 @@ Simulates the evolution of strategy frequencies over time and plots their trajec
         triangle_linewidth::Int = 2,
         legend::Bool = false,
         margin::Int = 2,
-        dpi = 300,
+        dpi::Int = 300,
     )::Plots.Plot
 
         num_trajectories = length(x0_list)
@@ -472,6 +472,7 @@ Simulates the evolution of strategy frequencies over time and plots their trajec
                         markercolor = :black,
                         markershape = :circle,
                         markersize = eq_size,
+                        markerstrokewidth = 2,
                         label = false)
                 else
                     # Plot unstable equilibrium as hollow circle
@@ -480,6 +481,7 @@ Simulates the evolution of strategy frequencies over time and plots their trajec
                         markerstrokecolor = :black,
                         markershape = :circle,
                         markersize = eq_size,
+                        markerstrokewidth = 2,
                         label = false)
                 end
             end
