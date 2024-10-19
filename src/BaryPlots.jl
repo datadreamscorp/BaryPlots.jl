@@ -6,7 +6,7 @@ module BaryPlots
 	using NLsolve
 	using ForwardDiff
 
-    export plot_evolution, ternary_coords, replicator_dynamics!, check_stability, find_equilibria, plot_simplex, ReplicatorParams
+    export plot_evolution, ternary_coords, replicator_dynamics!, check_stability, find_equilibria, plot_simplex, ReplicatorParams, generate_simplex_grid
 
 """
     ternary_coords(x::Vector{Float64}) -> Tuple{Float64, Float64}
