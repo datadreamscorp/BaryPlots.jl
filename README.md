@@ -62,7 +62,8 @@ plot_evolution(
 )::Plots.Plot
 
 ```
-    Parameters:
+
+#### Parameters:
 
     payoff_functions: A tuple of three payoff functions corresponding to each strategy.
 
@@ -113,8 +114,6 @@ plot_evolution(
     margin: Margin to exclude points near the boundaries in the contour plot.
     
     dpi: Dots per inch for the plot resolution.
-    
-    payoff_functions: A tuple of three payoff functions corresponding to each strategy.
 
 
 ### Example 1: Basic Hawk-Dove Dynamics
