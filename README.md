@@ -6,7 +6,7 @@ BaryPlots is a Julia package designed to visualize the evolutionary dynamics of 
 
 ### Installation
 
-To install BaryPlots, simply add the package from your local environment or by cloning the repository:
+To install BaryPlots, simply add the package from your local environment:
 
 ```julia
 
