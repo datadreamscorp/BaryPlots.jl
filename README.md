@@ -329,6 +329,6 @@ These dependencies are critical to the functionality of this package, and we tha
 
 If you use `BaryPlots.jl` in your research, please cite it as:
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13958127.svg)](https://doi.org/10.5281/zenodo.13958127)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14957156.svg)](https://doi.org/10.5281/zenodo.14957156)
 
 You can also download the citation in BibTeX, RIS, or other formats from Zenodo.
