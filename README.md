@@ -1,6 +1,6 @@
 # BaryPlots.jl
 
-<img src="./images/splash.png" alt="" width="700"/>
+<img src="./images/splash.png" alt="" width="400"/>
 
 BaryPlots is a Julia package designed to visualize the evolutionary dynamics of strategies in population games, inspired by Richard McElreath's [baryplot R package](https://github.com/rmcelreath/baryplot). It provides tools for plotting trajectories on a ternary simplex, determining equilibria, and visualizing payoff landscapes using contour plots.
 
