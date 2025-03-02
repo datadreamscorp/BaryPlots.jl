@@ -33,33 +33,34 @@ The `plot_evolution` function simulates and plots the evolution of strategy freq
 ```julia
 
 plot_evolution(
-    payoff_functions::Tuple{Function, Function, Function},
-    x0_list::Vector{<:AbstractVector{<:Real}},
-    tspan::Tuple{Float64, Float64};
-    labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"],
-    extra_params::NamedTuple = NamedTuple(),
-    steady_state_tol::Float64 = 1e-6,
-    arrow_list::Vector{Vector{Int}} = Vector{Vector{Int}}(),
-    trajectory_labels::Vector{String} = String[],
-    trajectory_colors::AbstractVector = Any[],
-    trajectory_linewidth::Int = 2,
-    num_initial_guesses::Int = 1000,
-    solver_tol::Float64 = 1e-8,
-    equilibrium_tol::Float64 = 1e-5,
-    validity_tol::Float64 = 1e-6,
-    stability_tol::Float64 = 1e-6,
-    eq_size::Int = 7,
-    colored_trajectories::Bool = false,
-    contourf::Bool = false,
-    contour_resolution::Int = 150,
-    contour_levels::Int = 10,
-    cbar::Bool = false,
-    triangle_linewidth::Int = 2,
-    legend::Bool = false,
-    margin::Int = 2,
-    dpi::Int = 300,
-    kwargs...
-)::Plots.Plot
+        payoff_functions::Tuple{Function, Function, Function},
+        x0_list::Vector{<:AbstractVector{<:Real}},
+        tspan::Tuple{Float64, Float64};
+        labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"],
+        extra_params::NamedTuple = NamedTuple(),
+        steady_state_tol::Float64 = 1e-6,
+        arrow_list::Vector{Vector{Int}} = Vector{Vector{Int}}(),
+        trajectory_labels::Vector{String} = String[],
+        trajectory_colors::AbstractVector = Any[],
+        trajectory_linewidth::Int = 2,
+        num_initial_guesses::Int = 1000,
+        solver_tol::Float64 = 1e-8,
+        equilibrium_tol::Float64 = 1e-5,
+        validity_tol::Float64 = 1e-6,
+        stability_tol::Float64 = 1e-6,
+        markersize::Int = 9,
+        markerstrokewidth::Int = 2,
+        colored_trajectories::Bool = false,
+        contour::Bool = false,
+        contour_color::Symbol = :roma,
+        contour_resolution::Int = 150,
+        contour_levels::Int = 10,
+        colorbar::Bool = false,
+        triangle_linewidth::Int = 2,
+        legend::Bool = false,
+        margin::Int = 2,
+        dpi::Int = 300,
+    )::Plots.Plot
 
 ```
     Parameters:
@@ -94,11 +95,13 @@ plot_evolution(
     
     stability_tol: Tolerance for stability analysis of equilibria.
     
-    eq_size: The size of the marker for equilibrium points.
+    markersize: Size of equilibrium markers.
+    
+    markerstrokewidth: Stroke width of the equilibrium marker boundary.
     
     colored_trajectories: Boolean flag indicating whether to color the trajectories or keep them black.
     
-    contourf: Boolean flag to include a filled contour plot of the average payoffs over the simplex.
+    contour: Boolean flag to include a filled contour plot of the average payoffs over the simplex.
     
     contour_resolution: Resolution of the contour plot grid.
     
