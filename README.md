@@ -6,7 +6,7 @@ BaryPlots is a Julia package designed to visualize the evolutionary dynamics of 
 
 ### Installation
 
-To install BaryPlots, simply add the package from your local environment or by cloning the repository:
+To install BaryPlots, simply add the package from your local environment:
 
 ```julia
 
@@ -63,7 +63,8 @@ plot_evolution(
     )::Plots.Plot
 
 ```
-    Parameters:
+
+#### Parameters:
 
     payoff_functions: A tuple of three payoff functions corresponding to each strategy.
 
@@ -116,8 +117,6 @@ plot_evolution(
     margin: Margin to exclude points near the boundaries in the contour plot.
     
     dpi: Dots per inch for the plot resolution.
-    
-    payoff_functions: A tuple of three payoff functions corresponding to each strategy.
 
 
 ### Example 1: Basic Hawk-Dove Dynamics
@@ -330,6 +329,6 @@ These dependencies are critical to the functionality of this package, and we tha
 
 If you use `BaryPlots.jl` in your research, please cite it as:
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13923783.svg)](https://doi.org/10.5281/zenodo.13923783)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.13958127.svg)](https://doi.org/10.5281/zenodo.13958127)
 
 You can also download the citation in BibTeX, RIS, or other formats from Zenodo.
