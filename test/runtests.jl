@@ -89,20 +89,6 @@ end
     @test isapprox(dx, expected_dx; atol=1e-15)
 end
 
-#=
-@testset "replicator_dynamics negative frequencies test" begin
-    payoff1(x, t, params) = x[2]
-    payoff2(x, t, params) = x[3]
-    payoff3(x, t, params) = x[1]
-
-    params = ReplicatorParams((payoff1, payoff2, payoff3), NamedTuple())
-
-    x0 = [-0.1, 0.6, 0.5]
-    dx = zeros(3)
-    @test_throws DomainError replicator_dynamics!(dx, x0, params, 0.0)
-end
-=#
-
 @testset "find_equilibria tests" begin
     # Simple payoff functions
     payoff1(x, t, params) = 1.0
