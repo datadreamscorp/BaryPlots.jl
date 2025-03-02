@@ -119,6 +119,7 @@ Plots an equilateral triangle representing the simplex for three strategies. Opt
         neutral_edges::Vector{Int} = Int[], 
         plot_neutral_dots::Bool = false, 
         p = nothing, 
+        dpi::Int = 300,
         kwargs...)::Plots.Plot
 
         if isnothing(p)
@@ -129,6 +130,7 @@ Plots an equilateral triangle representing the simplex for three strategies. Opt
                 framestyle = :none, 
                 xlabel = "", 
                 ylabel = "", 
+                dpi = dpi,
                 kwargs...)
         end
 
@@ -654,7 +656,8 @@ Simulates replicator dynamics trajectories within a 3-strategy simplex, locates 
             neutral_edges = neutral_edges, 
             plot_neutral_dots = true, 
             p = p, 
-            triangle_linewidth = triangle_linewidth
+            triangle_linewidth = triangle_linewidth,
+            dpi = dpi
         )
 
         # Plot the equilibria

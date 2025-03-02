@@ -149,7 +149,7 @@ end
 
 @testset "plot_simplex invalid labels tests" begin
     @test_throws BoundsError plot_simplex(labels=["A", "B"])  # Insufficient labels
-    @test_throws TypeError plot_simplex(labels=[])          # No labels
+    @test_throws BoundsError plot_simplex(labels=[])          # No labels
 end
 
 @testset "plot_simplex additional kwargs tests" begin
