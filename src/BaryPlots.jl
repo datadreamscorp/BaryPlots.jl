@@ -5,8 +5,57 @@ module BaryPlots
 	using LinearAlgebra
 	using NLsolve
 	using ForwardDiff
+    using LaTeXStrings
 
-    export plot_evolution, ternary_coords, replicator_dynamics!, check_stability, find_equilibria, plot_simplex, ReplicatorParams, generate_simplex_grid
+    export plot_evolution, ternary_coords, replicator_dynamics!, check_stability, find_equilibria, plot_simplex, ReplicatorParams, generate_simplex_grid, identify_neutral_edges
+
+"""
+    get_vertices() -> Vector{Vector{Float64}}
+
+Returns the corner points (vertices) of the 3-strategy simplex.
+
+# Returns
+- A vector of three vectors, `[ [1,0,0], [0,1,0], [0,0,1] ]`, each representing a pure strategy in the simplex.
+
+# Notes
+- These vertices are used as initial guesses for pure-strategy equilibria when searching for equilibria numerically.
+"""
+    function get_vertices()::Vector{Vector{Float64}}
+        return [
+            [1.0, 0.0, 0.0],  # Vertex for Strategy 1
+            [0.0, 1.0, 0.0],  # Vertex for Strategy 2
+            [0.0, 0.0, 1.0]   # Vertex for Strategy 3
+        ]
+    end
+
+"""
+    arrow0!(x, y, u, v; as=0.07, lw=1, lc=:black, la=1)
+
+Draws a custom arrow on an existing plot, starting at `(x, y)` and extending by `(u, v)`.
+
+# Arguments
+- `x`, `y`: Coordinates of the arrow's starting point.
+- `u`, `v`: The change in x- and y- coordinates from the start to the tip of the arrow.
+- `as`: Arrow size scaling factor. Default is `0.07`.
+- `lw`: Line width for the arrow body and head. Default is `1`.
+- `lc`: Line color for the arrow body and head. Default is `:black`.
+- `la`: Line alpha (transparency) for the arrow. Default is `1` (fully opaque).
+
+# Notes
+- The arrow head is drawn with two short lines forming a closed arrow tip.
+- `arrow0!` is used internally for drawing direction indicators on replicator dynamics trajectories.
+- This function modifies the plot in-place via `plot!`.
+"""
+    function arrow0!(x, y, u, v; as=0.07, lw=1, lc=:black, la=1)
+        nuv = sqrt(u^2 + v^2)
+        v1, v2 = [u;v] / nuv,  [-v;u] / nuv
+        v4 = (3*v1 + v2)/3.1623  # sqrt(10) to get unit vector
+        v5 = v4 - 2*(v4'*v2)*v2
+        v4, v5 = as*nuv*v4, as*nuv*v5
+        plot!([x,x+u], [y,y+v], lw=lw, lc=lc, la=la)
+        plot!([x+u,x+u-v5[1]], [y+v,y+v-v5[2]], lw=lw, lc=lc, la=la)
+        plot!([x+u,x+u-v4[1]], [y+v,y+v-v4[2]], lw=lw, lc=lc, la=la)
+    end
 
 """
     ternary_coords(x::Vector{Float64}) -> Tuple{Float64, Float64}
@@ -36,42 +85,122 @@ for plotting within a simplex (equilateral triangle).
         return (X, Y)
     end
 
-"""
-    plot_simplex(; labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"], kwargs...) -> Plots.Plot
 
-Plots an equilateral triangle representing the simplex for three strategies. Labels are added to the corners of the triangle.
+"""
+    plot_simplex(; 
+        labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"], 
+        neutral_edges::Vector{Int} = Int[], 
+        plot_neutral_dots::Bool = false, 
+        p = nothing, 
+        kwargs...
+    ) -> Plots.Plot
+
+Plots an equilateral triangle representing the simplex for three strategies. Optionally highlights certain edges as "neutral" by adding dotted markers if requested.
 
 # Arguments
-- `labels`: A vector of three strings that label the corners of the simplex. Default: `["Strategy 1", "Strategy 2", "Strategy 3"]`.
-- `kwargs`: Additional keyword arguments passed to the `plot` function.
+- `labels`: A vector of three strings labeling the corners of the simplex. Default: `["Strategy 1", "Strategy 2", "Strategy 3"]`.
+- `neutral_edges`: A vector of integers indicating which edges are neutral. Edges are indexed as:
+    - `1`: Edge between Strategy 1 and Strategy 2
+    - `2`: Edge between Strategy 2 and Strategy 3
+    - `3`: Edge between Strategy 3 and Strategy 1
+- `plot_neutral_dots`: If `true`, draws a sequence of white dots on each specified neutral edge to visually mark them. Default: `false`.
+- `p`: An existing `Plots.Plot` object to draw on. If `nothing`, a new plot is created.
+- `kwargs`: Additional keyword arguments passed to `plot` for further customization.
 
 # Returns
-- A `Plot` object displaying the simplex triangle with the specified labels.
+- A `Plots.Plot` object displaying the simplex with labeled corners. Edges in `neutral_edges` may be visually highlighted.
 
 # Notes
-- This function sets up the simplex plot, which can be used as a background for plotting evolutionary dynamics.
+- When `plot_neutral_dots` is `false`, the edges in `neutral_edges` are simply not drawn (or drawn in a minimal style, as configured in the source).
+- If you want to add further customizations, you can pass typical Plots.jl arguments (e.g., `linecolor`, `linestyle`, etc.) through `kwargs`.
 """
-    function plot_simplex(; labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"], kwargs...)
-        triangle_x = [0.0, 1.0, 0.5, 0.0]
-        triangle_y = [0.0, 0.0, sqrt(3)/2, 0.0]
-        plot(triangle_x, triangle_y;
-            seriestype = :shape,
-            aspect_ratio = 1,
-            linewidth = 2,
-            fillcolor = :white,
-            linecolor = :black,
-            legend = false,
-            xlabel = "",
-            ylabel = "",
-            xlims = (-0.1, 1.1),
-            ylims = (-0.1, sqrt(3)/2 + 0.1),
-            framestyle = :none,
-            dpi = 300,
-            kwargs...)
-        # Corrected labels
-        annotate!(0.0, -0.05, text(labels[2], :center))  # Left corner (Loner)
-        annotate!(1.0, -0.05, text(labels[1], :center))  # Right corner (Sharer)
-        annotate!(0.5, sqrt(3)/2 + 0.05, text(labels[3], :center)) # Top corner (Hoarder)
+    function plot_simplex(; 
+        labels = ["Strategy 1", "Strategy 2", "Strategy 3"], 
+        neutral_edges::Vector{Int} = Int[], 
+        plot_neutral_dots::Bool = false, 
+        p = nothing, 
+        dpi::Int = 300,
+        kwargs...)::Plots.Plot
+
+        if isnothing(p)
+            p = plot(; 
+                aspect_ratio = 1, 
+                xlims = (-0.1, 1.1), 
+                ylims = (-0.1, sqrt(3)/2 + 0.1), 
+                framestyle = :none, 
+                xlabel = "", 
+                ylabel = "", 
+                dpi = dpi,
+                kwargs...)
+        end
+
+        # Define the three edges of the simplex based on updated ordering
+        edges = [
+            ([0.0, 1.0], [0.0, 0.0]),                # Edge 1: Strategy 2 ↔ Strategy 1 (Bottom Left ↔ Bottom Right)
+            ([1.0, 0.5], [0.0, sqrt(3)/2]),         # Edge 2: Strategy 1 ↔ Strategy 3 (Bottom Right ↔ Top)
+            ([0.5, 0.0], [sqrt(3)/2, 0.0])          # Edge 3: Strategy 3 ↔ Strategy 2 (Top ↔ Bottom Left)
+        ]
+
+        # Define number of dots for neutral edges
+        num_dots = 15  # Adjust as needed for spacing
+
+        for (idx, (x_coords, y_coords)) in enumerate(edges)
+            if plot_neutral_dots
+                if idx in neutral_edges
+                    plot!(p, x_coords, y_coords; 
+                        seriestype = :path, 
+                        linewidth = 2, 
+                        linecolor = :black, 
+                        linestyle = :solid, 
+                        legend = false)
+                    
+                    # Plot neutral edges as a sequence of white dots
+                    x_start, x_end = x_coords
+                    y_start, y_end = y_coords
+
+                    # Generate evenly spaced points along the edge
+                    for i in 1:num_dots
+                        frac = (i - 1) / (num_dots - 1)
+                        x = x_start + frac * (x_end - x_start)
+                        y = y_start + frac * (y_end - y_start)
+                        scatter!(p, [x], [y]; 
+                            markercolor = :white, 
+                            markersize = 9, 
+                            markerstrokewidth = 2,
+                            label = false)
+                    end
+                end
+            else
+                # Plot regular edges
+                if !(idx in neutral_edges)  # Plot only non-neutral edges
+                    plot!(p, x_coords, y_coords; 
+                        seriestype = :path, 
+                        linewidth = 2, 
+                        linecolor = :black, 
+                        linestyle = :solid, 
+                        legend = false)
+                else
+                    # Optionally, plot regular lines for neutral edges with reduced opacity
+                    # Uncomment the following lines if desired
+                    # plot!(p, x_coords, y_coords; 
+                    #     seriestype = :path, 
+                    #     linewidth = 2, 
+                    #     linecolor = :black, 
+                    #     linestyle = :solid, 
+                    #     alpha = 0.3, 
+                    #     legend = false)
+                end
+            end
+        end
+
+        # Add labels to the corners
+        if !plot_neutral_dots
+            annotate!(p, 0.0, -0.1, text(labels[2], :center))  # Left corner (Strategy 2)
+            annotate!(p, 1.0, -0.1, text(labels[1], :center))  # Right corner (Strategy 1)
+            annotate!(p, 0.5, sqrt(3)/2 + 0.1, text(labels[3], :center)) # Top corner (Strategy 3)
+        end
+
+        return p
     end
 
 """
@@ -84,10 +213,59 @@ Holds parameters for the replicator dynamics, including payoff functions and ext
 - `extra_params`: A `NamedTuple` containing additional parameters required by the payoff functions.
 """
     struct ReplicatorParams
-        
         payoff_functions::Tuple{Function, Function, Function}  # Payoff functions for strategies
         extra_params::NamedTuple # Additional parameters for payoff functions
     end
+
+
+"""
+    identify_neutral_edges(params::ReplicatorParams; tol::Float64 = 1e-8, samples::Int = 100) -> Vector{Int}
+
+Identifies "neutral" edges in the simplex under the given payoff functions. An edge is neutral if, for all sampled points on that edge, the payoffs of the two involved strategies are effectively equal.
+
+# Arguments
+- `params`: A `ReplicatorParams` struct containing the payoff functions and extra parameters.
+- `tol`: Tolerance for payoff difference. If `|wᵢ - wⱼ|` < `tol` across all samples, that edge is considered neutral.
+- `samples`: Number of points to sample along each edge. Default is `100`.
+
+# Returns
+- A vector of edge indices `{1,2,3}`, each corresponding to:
+  - `1`: Edge between Strategy 1 and Strategy 2
+  - `2`: Edge between Strategy 2 and Strategy 3
+  - `3`: Edge between Strategy 3 and Strategy 1
+
+# Notes
+- This function is used inside `plot_evolution` to highlight edges where the game exhibits neutral stability. 
+"""
+    function identify_neutral_edges(params::ReplicatorParams; tol::Float64 = 1e-8, samples::Int = 100)::Vector{Int}
+        edges = [(2, 1), (1, 3), (3, 2)]
+        neutral_edges = Int[]  # List to store indices of neutral edges
+
+        for (idx, (i, j)) in enumerate(edges)
+            is_neutral = true
+            for s in 0:(samples - 1)
+                frac = s / (samples - 1)
+                # Define frequencies for strategies i and j
+                x = zeros(3)
+                x[i] = 1.0 - frac
+                x[j] = frac
+                # Compute payoffs for strategies i and j
+                w_i = params.payoff_functions[i](x, 0.0, params.extra_params)
+                w_j = params.payoff_functions[j](x, 0.0, params.extra_params)
+                # Check if payoffs are equal within tolerance
+                if abs(w_i - w_j) > tol
+                    is_neutral = false
+                    break
+                end
+            end
+            if is_neutral
+                push!(neutral_edges, idx)
+            end
+        end
+
+        return neutral_edges
+    end
+
 
 """
     replicator_dynamics!(dx::Vector{Float64}, x::Vector{Float64}, params::ReplicatorParams, t::Float64)
@@ -126,6 +304,8 @@ Computes the time derivative of the replicator dynamics for a population playing
         dx .= x_normalized .* (payoffs .- avg_payoff)
     end
 
+
+
 """
     create_steady_state_callback(steady_state_tol::Float64) -> DiscreteCallback
 
@@ -151,6 +331,8 @@ Creates a callback function for use with DifferentialEquations.jl solvers that t
         affect!(integrator) = terminate!(integrator)
         return DiscreteCallback(condition, affect!)
     end
+
+
 
 """
     generate_simplex_grid(resolution::Int, margin::Int = 1) -> Vector{Vector{Float64}}
@@ -184,6 +366,8 @@ Generates a list of points within the simplex by discretizing the simplex into a
         return points
     end
     
+
+
 """
     compute_average_payoffs(grid_points::Vector{Vector{Float64}}, payoff_functions::Tuple{Function, Function, Function}, params::NamedTuple) -> Vector{Float64}
 
@@ -212,6 +396,8 @@ Computes the average payoff for each point in `grid_points` given the payoff fun
         return avg_payoffs
     end
     
+
+
 """
     get_ternary_coordinates(grid_points::Vector{Vector{Float64}}) -> Tuple{Vector{Float64}, Vector{Float64}}
 
@@ -256,60 +442,68 @@ Converts a list of points in strategy frequency space to their corresponding ter
         equilibrium_tol::Float64 = 1e-5,
         validity_tol::Float64 = 1e-6,
         stability_tol::Float64 = 1e-6,
-        eq_size::Int = 7,
+        markersize::Int = 9,
+        markerstrokewidth::Int = 2,
         colored_trajectories::Bool = false,
-        contourf::Bool = false,
+        contour::Bool = false,
+        contour_color::Symbol = :roma,
         contour_resolution::Int = 150,
         contour_levels::Int = 10,
-        cbar::Bool = false,
+        colorbar::Bool = false,
         triangle_linewidth::Int = 2,
         legend::Bool = false,
         margin::Int = 2,
-        dpi = 300,
+        dpi::Int = 300,
     )::Plots.Plot
 
-Simulates the evolution of strategy frequencies over time and plots their trajectories within a ternary simplex. It also computes and plots the equilibria of the system and optionally overlays a contour plot.
+Simulates replicator dynamics trajectories within a 3-strategy simplex, locates equilibria, and creates a ternary plot of the results.
 
 # Arguments
-- `payoff_functions`: A tuple of three payoff functions corresponding to each strategy.
-- `x0_list`: A vector of initial conditions (strategy frequencies) to simulate trajectories.
-- `tspan`: A tuple representing the time span for the simulation.
-- `labels`: Labels for the corners of the simplex. Default: `["Strategy 1", "Strategy 2", "Strategy 3"]`.
-- `extra_params`: Extra parameters for the payoff functions (optional).
-- `steady_state_tol`: Tolerance for determining when a trajectory reaches steady state.
-- `arrow_list`: A list of indices indicating where to draw arrows along the trajectories.
-- `trajectory_labels`: Labels for each trajectory (optional).
-- `trajectory_colors`: Colors for each trajectory (optional).
-- `trajectory_linewidth`: Line width for the trajectory lines.
-- `num_initial_guesses`: Number of initial guesses for finding equilibria.
-- `solver_tol`: Tolerance for the numerical solver when finding equilibria.
-- `equilibrium_tol`: Tolerance for determining equilibria uniqueness.
-- `validity_tol`: Tolerance for validating equilibrium points within the simplex.
-- `stability_tol`: Tolerance for stability analysis of equilibria.
-- `eq_size`: Size of the markers representing equilibria.
-- `colored_trajectories`: Whether to color trajectories differently.
-- `contourf`: Whether to include a contour plot of average payoffs.
-- `contour_resolution`: Resolution of the contour plot grid.
-- `contour_levels`: Number of contour levels.
-- `cbar`: Whether to include a color bar in the contour plot.
-- `triangle_linewidth`: Line width for the simplex triangle.
-- `legend`: Whether to include a legend.
-- `margin`: Margin to exclude points near the boundaries in the contour plot.
-- `dpi`: Dots per inch for the plot resolution.
+- `payoff_functions`: A tuple of three payoff functions `(payoff1, payoff2, payoff3)`, each accepting `(x, t, params)` where `x` is the normalized frequency vector.
+- `x0_list`: A collection of initial conditions in the simplex (each a length-3 vector). Each trajectory is simulated from these initial points.
+- `tspan`: A tuple `(tstart, tfinal)` specifying the integration window.
+- `labels`: Labels for the triangle corners. Default is `["Strategy 1", "Strategy 2", "Strategy 3"]`.
+- `extra_params`: Additional parameters passed to the payoff functions, packaged in a `NamedTuple`.
+- `steady_state_tol`: If the norm of the derivative falls below this threshold, the solver stops early (via a callback).
+- `arrow_list`: An array-of-arrays specifying indices at which to draw an arrow along each trajectory.
+- `trajectory_labels`: Labels for each trajectory if you want a legend. Defaults to "Trajectory i" for i in `1:length(x0_list)`.
+- `trajectory_colors`: Colors for trajectories. If empty, defaults to black for all or a tab10 palette if `colored_trajectories` is true.
+- `trajectory_linewidth`: Width of the lines used for plotting trajectories.
+- `num_initial_guesses`: Number of random initial guesses for root-finding to locate equilibria.
+- `solver_tol`: Tolerance used internally by the nonlinear solver for equilibrium-finding.
+- `equilibrium_tol`: Tolerance for declaring two equilibria to be effectively the same.
+- `validity_tol`: Tolerance for points to be considered inside the simplex (0 ≤ xᵢ ≤ 1).
+- `stability_tol`: Tolerance used when deciding if all eigenvalues have negative real parts (stable).
+- `markersize`: Size of equilibrium markers.
+- `markerstrokewidth`: Stroke width of the equilibrium marker boundary.
+- `colored_trajectories`: If `true`, color each trajectory differently using a color palette; otherwise, use a single color.
+- `contour`: Whether to overlay a contour plot of average payoffs. If `true`, uses `scatter` to color each simplex grid point by its average payoff.
+- `contour_color`: A symbol representing the color gradient (e.g. `:viridis`, `:roma`) for the contour plot.
+- `contour_resolution`: Resolution of the simplex grid for contour plotting.
+- `contour_levels`: Number of contour levels to display (used in color scaling).
+- `colorbar`: Whether to display a color bar when `contour` is `true`.
+- `triangle_linewidth`: Line width for the simplex boundary lines.
+- `legend`: Whether to display a legend for trajectory labels.
+- `margin`: How many rows/columns of the simplex grid to skip from the edges when computing and plotting contour points (avoid overlapping boundaries).
+- `dpi`: Resolution for the final plot.
 
 # Returns
-- A `Plot` object displaying the simplex with the trajectories and equilibria.
+- A `Plots.Plot` object with:
+  1. An (optional) contour plot of average payoffs in the simplex.
+  2. Ternary simplex edges (with neutral edges optionally highlighted).
+  3. Simulated trajectories from the provided initial conditions.
+  4. Detected equilibria, marked as filled circles if stable or hollow circles if unstable.
 
 # Notes
-- Trajectories are simulated using the replicator dynamics defined by the provided payoff functions.
-- Equilibria are computed numerically and their stability is assessed.
-- If `contourf` is `true`, a contour plot of average payoffs is overlaid on the simplex.
+- Internally calls `identify_neutral_edges` to highlight edges where payoffs between two strategies are equal for all points along that edge.
+- Equilibria are located with `find_equilibria`, and each one is tested for stability by analyzing the Jacobian.
+- The arrow drawing is handled by `arrow0!`, with user-specified arrow positions in `arrow_list`.
 """
     function plot_evolution(
         payoff_functions::Tuple{Function, Function, Function},
         x0_list::Vector{<:AbstractVector{<:Real}},
         tspan::Tuple{Float64, Float64};
-        labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"],
+        labels::Vector{} = ["Strategy 1", "Strategy 2", "Strategy 3"],
         extra_params::NamedTuple = NamedTuple(),
         steady_state_tol::Float64 = 1e-6,
         arrow_list::Vector{Vector{Int}} = Vector{Vector{Int}}(),
@@ -321,12 +515,14 @@ Simulates the evolution of strategy frequencies over time and plots their trajec
         equilibrium_tol::Float64 = 1e-5,
         validity_tol::Float64 = 1e-6,
         stability_tol::Float64 = 1e-6,
-        eq_size::Int = 7,
+        markersize::Int = 9,
+        markerstrokewidth::Int = 2,
         colored_trajectories::Bool = false,
-        contourf::Bool = false,
+        contour::Bool = false,
+        contour_color::Symbol = :roma,
         contour_resolution::Int = 150,
         contour_levels::Int = 10,
-        cbar::Bool = false,
+        colorbar::Bool = false,
         triangle_linewidth::Int = 2,
         legend::Bool = false,
         margin::Int = 2,
@@ -350,6 +546,9 @@ Simulates the evolution of strategy frequencies over time and plots their trajec
         # Prepare the parameters
         params = ReplicatorParams(payoff_functions, extra_params)
 
+        # Identify neutral edges
+        neutral_edges = identify_neutral_edges(params)
+
         # Create the steady state callback
         cb = create_steady_state_callback(steady_state_tol)
 
@@ -365,18 +564,19 @@ Simulates the evolution of strategy frequencies over time and plots their trajec
         )
 
         # Start plotting
-        if contourf
+        if contour
             # Generate the simplex grid without boundary points
             grid_points = generate_simplex_grid(contour_resolution, margin)
             X_coords, Y_coords = get_ternary_coordinates(grid_points)
             Z_values = compute_average_payoffs(grid_points, payoff_functions, extra_params)
     
             # Create the contour plot using scatter with color mapping
-            p = scatter(X_coords, Y_coords;
+            p = scatter(
+                X_coords, Y_coords;
                 zcolor = Z_values,
                 markersize = 5,
                 markerstrokewidth = 0,
-                colorbar = cbar,
+                colorbar = colorbar,
                 legend = false,
                 xlabel = "",
                 ylabel = "",
@@ -384,8 +584,9 @@ Simulates the evolution of strategy frequencies over time and plots their trajec
                 ylims = (-0.1, sqrt(3)/2 + 0.1),
                 aspect_ratio = 1,
                 framestyle = :none,
-                c = :viridis,
-                dpi = dpi)
+                c = contour_color,
+                dpi = dpi
+                )
     
             # Plot the simplex boundaries
             triangle_x = [0.0, 1.0, 0.5, 0.0]
@@ -393,12 +594,12 @@ Simulates the evolution of strategy frequencies over time and plots their trajec
             plot!(p, triangle_x, triangle_y, color=:black, linewidth=triangle_linewidth, legend=false)
     
             # Add labels
-            annotate!(p, 0.0, -0.05, text(labels[2], :center))
-            annotate!(p, 1.0, -0.05, text(labels[1], :center))
-            annotate!(p, 0.5, sqrt(3)/2 + 0.05, text(labels[3], :center))
+            annotate!(p, 0.0, -0.1, text(labels[2], :center))
+            annotate!(p, 1.0, -0.1, text(labels[1], :center))
+            annotate!(p, 0.5, sqrt(3)/2 + 0.1, text(labels[3], :center))
         else
             # Existing code to plot the simplex without contour
-            p = plot_simplex(labels = labels, linewidth=triangle_linewidth)
+            p = plot_simplex(labels = labels, neutral_edges = neutral_edges, linewidth=triangle_linewidth)
         end
 
         # Plotting trajectories
@@ -443,20 +644,21 @@ Simulates the evolution of strategy frequencies over time and plots their trajec
                             dy_arrow /= norm_factor
                             dx_arrow *= arrow_scale
                             dy_arrow *= arrow_scale
-                            quiver!(
-                                p,
-                                [x_start], 
-                                [y_start], 
-                                quiver=(
-                                    [dx_arrow], [dy_arrow]);
-                                    arrow=:closed, color=trajectory_colors[i],
-                                    linewidth=trajectory_linewidth, label=false
-                            )
+                            arrow0!(x_start, y_start, dx_arrow, dy_arrow; as=4.0, lc=:black, la=1, lw=2)
                         end
                     end
                 end
             end
         end
+
+        p = plot_simplex(
+            labels = labels, 
+            neutral_edges = neutral_edges, 
+            plot_neutral_dots = true, 
+            p = p, 
+            triangle_linewidth = triangle_linewidth,
+            dpi = dpi
+        )
 
         # Plot the equilibria
         if !isempty(equilibria)
@@ -466,23 +668,46 @@ Simulates the evolution of strategy frequencies over time and plots their trajec
                 x_eq = x_eq / sum(x_eq)
                 X_eq, Y_eq = ternary_coords(x_eq)
 
-                if is_stable
-                    # Plot stable equilibrium as filled black circle
-                    scatter!(p, [X_eq], [Y_eq];
-                        markercolor = :black,
-                        markershape = :circle,
-                        markersize = eq_size,
-                        markerstrokewidth = 2,
-                        label = false)
-                else
-                    # Plot unstable equilibrium as hollow circle
-                    scatter!(p, [X_eq], [Y_eq];
-                        markercolor = :white,
-                        markerstrokecolor = :black,
-                        markershape = :circle,
-                        markersize = eq_size,
-                        markerstrokewidth = 2,
-                        label = false)
+                 # Determine if equilibrium lies on a neutral edge
+                zero_tol = 1e-2  # Tolerance for zero frequency
+                edge_idx = 0  # Initialize edge index
+
+                if abs(x_eq[3]) < zero_tol
+                    edge_idx = 1  # Edge between Strategy 2 and Strategy 1
+                elseif abs(x_eq[2]) < zero_tol
+                    edge_idx = 2  # Edge between Strategy 1 and Strategy 3
+                elseif abs(x_eq[1]) < zero_tol
+                    edge_idx = 3  # Edge between Strategy 3 and Strategy 2
+                end     
+                
+                # Check if equilibrium is at a vertex (two frequencies near zero)
+                num_zero = sum([abs(x_eq[1]) < zero_tol, 
+                abs(x_eq[2]) < zero_tol, 
+                abs(x_eq[3]) < zero_tol])
+                is_vertex = num_zero >= 2
+
+                # If equilibrium is on a neutral edge and is unstable, skip plotting
+                if !( (edge_idx != 0 && edge_idx in neutral_edges) ) || is_vertex
+
+                    if is_stable
+                        # Plot stable equilibrium as filled black circle
+                        scatter!(p, [X_eq], [Y_eq];
+                            markercolor = :black,
+                            markershape = :circle,
+                            markersize = markersize,
+                            markerstrokewidth = markerstrokewidth,
+                            label = false)
+                    else
+                        # Plot unstable equilibrium as hollow circle
+                        scatter!(p, [X_eq], [Y_eq];
+                            markercolor = :white,
+                            markerstrokecolor = :black,
+                            markershape = :circle,
+                            markersize = markersize,
+                            markerstrokewidth = markerstrokewidth,
+                            label = false)
+                    end
+
                 end
             end
         end
@@ -496,6 +721,8 @@ Simulates the evolution of strategy frequencies over time and plots their trajec
 
         return p
     end
+    
+
 
 """
     generate_initial_guesses(n::Int) -> Vector{Vector{Float64}}
@@ -521,6 +748,8 @@ Generates random initial guesses within the simplex for finding equilibria.
         return guesses
     end
 
+
+
 """
     replicator_equation(x::Vector{Float64}, params::ReplicatorParams, t::Float64) -> Vector{Float64}
 
@@ -542,6 +771,8 @@ Computes the replicator dynamics equation at a given point.
         replicator_dynamics!(dx, x, params, t)
         return dx
     end
+
+
 
 """
     equilibrium_exists(x_new::Vector{Float64}, equilibria::Vector{Vector{Float64}}, equilibrium_tol::Float64) -> Bool
@@ -569,6 +800,8 @@ Checks if a newly found equilibrium already exists in the list of equilibria.
         end
         return false
     end
+
+
 
 """
     check_stability(x_eq::Vector{Float64}, params::ReplicatorParams; stability_tol::Float64 = 1e-6) -> Bool
@@ -613,6 +846,8 @@ Determines the stability of an equilibrium point by analyzing the eigenvalues of
         # Otherwise, check if all real parts are strictly negative for stability
         return all(real(eigenvalues) .< -stability_tol)
     end
+
+
 
 """
     find_equilibria(
@@ -659,6 +894,10 @@ Finds the equilibria of the replicator dynamics system by numerically solving fo
     
         # Generate initial guesses within the simplex
         initial_guesses = generate_initial_guesses(num_initial_guesses)
+
+        # Get vertices and add to initial guesses
+        vertices = get_vertices()
+        initial_guesses = vcat(vertices, initial_guesses)
     
         # Prepare parameters
         replicator_params = ReplicatorParams(payoff_functions, params)

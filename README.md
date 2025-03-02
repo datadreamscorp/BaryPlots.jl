@@ -1,6 +1,6 @@
 # BaryPlots.jl
 
-<img src="./images/splash.png" alt="" width="500"/>
+<img src="./images/splash.png" alt="" width="400"/>
 
 BaryPlots is a Julia package designed to visualize the evolutionary dynamics of strategies in population games, inspired by Richard McElreath's [baryplot R package](https://github.com/rmcelreath/baryplot). It provides tools for plotting trajectories on a ternary simplex, determining equilibria, and visualizing payoff landscapes using contour plots.
 
@@ -33,33 +33,34 @@ The `plot_evolution` function simulates and plots the evolution of strategy freq
 ```julia
 
 plot_evolution(
-    payoff_functions::Tuple{Function, Function, Function},
-    x0_list::Vector{<:AbstractVector{<:Real}},
-    tspan::Tuple{Float64, Float64};
-    labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"],
-    extra_params::NamedTuple = NamedTuple(),
-    steady_state_tol::Float64 = 1e-6,
-    arrow_list::Vector{Vector{Int}} = Vector{Vector{Int}}(),
-    trajectory_labels::Vector{String} = String[],
-    trajectory_colors::AbstractVector = Any[],
-    trajectory_linewidth::Int = 2,
-    num_initial_guesses::Int = 1000,
-    solver_tol::Float64 = 1e-8,
-    equilibrium_tol::Float64 = 1e-5,
-    validity_tol::Float64 = 1e-6,
-    stability_tol::Float64 = 1e-6,
-    eq_size::Int = 7,
-    colored_trajectories::Bool = false,
-    contourf::Bool = false,
-    contour_resolution::Int = 150,
-    contour_levels::Int = 10,
-    cbar::Bool = false,
-    triangle_linewidth::Int = 2,
-    legend::Bool = false,
-    margin::Int = 2,
-    dpi::Int = 300,
-    kwargs...
-)::Plots.Plot
+        payoff_functions::Tuple{Function, Function, Function},
+        x0_list::Vector{<:AbstractVector{<:Real}},
+        tspan::Tuple{Float64, Float64};
+        labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"],
+        extra_params::NamedTuple = NamedTuple(),
+        steady_state_tol::Float64 = 1e-6,
+        arrow_list::Vector{Vector{Int}} = Vector{Vector{Int}}(),
+        trajectory_labels::Vector{String} = String[],
+        trajectory_colors::AbstractVector = Any[],
+        trajectory_linewidth::Int = 2,
+        num_initial_guesses::Int = 1000,
+        solver_tol::Float64 = 1e-8,
+        equilibrium_tol::Float64 = 1e-5,
+        validity_tol::Float64 = 1e-6,
+        stability_tol::Float64 = 1e-6,
+        markersize::Int = 9,
+        markerstrokewidth::Int = 2,
+        colored_trajectories::Bool = false,
+        contour::Bool = false,
+        contour_color::Symbol = :roma,
+        contour_resolution::Int = 150,
+        contour_levels::Int = 10,
+        colorbar::Bool = false,
+        triangle_linewidth::Int = 2,
+        legend::Bool = false,
+        margin::Int = 2,
+        dpi::Int = 300,
+    )::Plots.Plot
 
 ```
 
@@ -95,11 +96,13 @@ plot_evolution(
     
     stability_tol: Tolerance for stability analysis of equilibria.
     
-    eq_size: The size of the marker for equilibrium points.
+    markersize: Size of equilibrium markers.
+    
+    markerstrokewidth: Stroke width of the equilibrium marker boundary.
     
     colored_trajectories: Boolean flag indicating whether to color the trajectories or keep them black.
     
-    contourf: Boolean flag to include a filled contour plot of the average payoffs over the simplex.
+    contour: Boolean flag to include a filled contour plot of the average payoffs over the simplex.
     
     contour_resolution: Resolution of the contour plot grid.
     
@@ -124,7 +127,7 @@ In this example, we simulate the Hawk-Dove game and include a contour plot to vi
 
 ```julia
 
-using BaryPlots
+using BaryPlots, LaTeXStrings
 
 # Payoff functions for Hawk-Dove game
 function hd_payoff_H(x, t, params)
@@ -163,9 +166,9 @@ p = plot_evolution(
     payoff_functions,
     initial_conditions,
     (0.0, 100.0);
-    labels = ["Hawk", "Dove", "Loner"],
+    labels = [L"\mathrm{Hawk", L"\mathrm{Dove}", L"\mathrm{Loner}"],
     arrow_list = [ [300], [300] ],
-    contourf = true,              # Include contour plot
+    contour = true,              # Include contour plot
 )
 
 display(p)
@@ -183,38 +186,38 @@ In this example, we simulate the evolution of strategies in the Rock-Paper-Sciss
 ```julia
 
 # Payoff for Rock (R)
-	function rps_payoff_R(x, t, params)
-	    R, P, S = x[1], x[2], x[3]
-	    return 0 * R + 1 * S - 1 * P  # Rock beats Scissors
-	end
+function rps_payoff_R(x, t, params)
+    R, P, S = x[1], x[2], x[3]
+    return 0 * R + 1 * S - 1 * P  # Rock beats Scissors
+end
+
+# Payoff for Paper (P)
+function rps_payoff_P(x, t, params)
+    R, P, S = x[1], x[2], x[3]
+    return 0 * P + 1 * R - 1 * S # Paper beats Rock
+end
+
+# Payoff for Scissors (S)
+function rps_payoff_S(x, t, params)
+    R, P, S = x[1], x[2], x[3]
+    return 0 * S + 1 * P - 1 * R  # Scissors beat Paper
+end
+
+# Initial conditions
+initial_conditions = [
+    [0.6, 0.3, 0.1], 
+    [0.2, 0.4, 0.4]
+    ]
 	
-	# Payoff for Paper (P)
-	function rps_payoff_P(x, t, params)
-	    R, P, S = x[1], x[2], x[3]
-	    return 0 * P + 1 * R - 1 * S # Paper beats Rock
-	end
-	
-	# Payoff for Scissors (S)
-	function rps_payoff_S(x, t, params)
-	    R, P, S = x[1], x[2], x[3]
-	    return 0 * S + 1 * P - 1 * R  # Scissors beat Paper
-	end
-	
-	# Initial conditions
-	initial_conditions = [
-        [0.6, 0.3, 0.1], 
-        [0.2, 0.4, 0.4]
-        ]
-	
-	# Simulate and plot
-	plot_evolution(
-	    (rps_payoff_R, rps_payoff_P, rps_payoff_S),
-	    initial_conditions,
-	    (0.0, 100.0),
-	    labels=["Rock", "Paper", "Scissors"],
-        arrow_list = [ [100], [100] ],
-	    colored_trajectories = true
-	)
+# Simulate and plot
+plot_evolution(
+    (rps_payoff_R, rps_payoff_P, rps_payoff_S),
+    initial_conditions,
+    (0.0, 100.0),
+    labels=[L"\mathrm{Rock}", L"\mathrm{Paper}", L"\mathrm{Scissors}"],
+    arrow_list = [ [100], [100] ],
+    colored_trajectories = true
+)
 
 ```
 
@@ -252,10 +255,10 @@ end
 
 # Set up the parameterized game with benefit multiplier b = 2.0
 params = (b = 2.0, )
-payoff_functions = (pg_payoff_C, pg_payoff_F, pg_payoff_dummy)
+payoff_functions_PG = (pg_payoff_C, pg_payoff_F, pg_payoff_dummy)
 
 # Initial conditions for different starting frequencies of strategies
-initial_conditions = [
+initial_conditions_PG = [
     [0.51, 0.49, 0.0],
     [0.49, 0.51, 0.0],
 	[0.1, 0.1, 0.80]
@@ -263,10 +266,10 @@ initial_conditions = [
 
 # Simulate and plot the dynamics
 plot_evolution(
-    payoff_functions,
-    initial_conditions,
+    payoff_functions_PG,
+    initial_conditions_PG,
     (0.0, 100.0);
-    labels = ["Contribute", "Free Ride", "Loner"],
+    labels = [L"\mathrm{Contribute}", L"\mathrm{Free\ Ride}", L"\mathrm{Loner}"],
     extra_params = params,
     colored_trajectories = true,
     arrow_list = [ [500, 1000], [500, 1000], [200] ],
@@ -287,15 +290,19 @@ You can customize several aspects of the plot, including the colors of the traje
 
     colored_trajectories: Set this flag to true to have different colors for each trajectory, or keep it false for black trajectories.
     
-    contourf: Set this flag to true to include a filled contour plot of the average payoffs over the simplex.
+    contour: Set this flag to true to include a filled contour plot of the average payoffs over the simplex.
     
     contour_resolution: Adjust the resolution of the contour plot grid.
     
     contour_levels: Set the number of contour levels in the contour plot.
     
-    cbar: Include a color bar in the contour plot by setting this flag to true.
+    colorbar: Include a color bar in the contour plot by setting this flag to true.
     
     triangle_linewidth: Adjust the line width of the simplex triangle.
+    
+    markersize: Set the size of equilibrium markers.
+    
+    markerstrokewidth: Stroke width of the equilibrium marker boundary.
     
     legend: Set to true to include a legend in the plot.
 
