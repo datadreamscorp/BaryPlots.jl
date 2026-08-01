@@ -415,6 +415,50 @@ end
 end
 =#
 
+@testset "identify_neutral_edges tests" begin
+    # Edge indices are 1 = {1,2}, 2 = {1,3}, 3 = {2,3}. Each game below makes exactly
+    # one pair of payoffs equal along its shared edge and unequal along the others.
+    nofix(x, t, params) = 5.0
+
+    # w1 == w2 along the x3 = 0 edge
+    a1(x, t, params) = x[1]
+    a2(x, t, params) = x[1]
+    @test identify_neutral_edges(ReplicatorParams((a1, a2, nofix), NamedTuple())) == [1]
+
+    # w1 == w3 along the x2 = 0 edge
+    b1(x, t, params) = x[1]
+    b3(x, t, params) = x[1]
+    @test identify_neutral_edges(ReplicatorParams((b1, nofix, b3), NamedTuple())) == [2]
+
+    # w2 == w3 along the x1 = 0 edge
+    c2(x, t, params) = x[2]
+    c3(x, t, params) = x[2]
+    @test identify_neutral_edges(ReplicatorParams((nofix, c2, c3), NamedTuple())) == [3]
+
+    # All three payoffs identical => every edge is neutral
+    flat(x, t, params) = 1.0
+    @test identify_neutral_edges(ReplicatorParams((flat, flat, flat), NamedTuple())) == [1, 2, 3]
+
+    # Rock-Paper-Scissors has no neutral edge
+    rps_R(x, t, params) = -x[2] + x[3]
+    rps_P(x, t, params) = x[1] - x[3]
+    rps_S(x, t, params) = -x[1] + x[2]
+    @test isempty(identify_neutral_edges(ReplicatorParams((rps_R, rps_P, rps_S), NamedTuple())))
+
+    # tol controls how close payoffs must be to count as neutral
+    near1(x, t, params) = x[1]
+    near2(x, t, params) = x[1] + 1e-4
+    near_params = ReplicatorParams((near1, near2, nofix), NamedTuple())
+    @test isempty(identify_neutral_edges(near_params))              # default tol = 1e-8
+    @test identify_neutral_edges(near_params; tol = 1e-2) == [1]
+end
+
+@testset "plot_simplex neutral edge tests" begin
+    @test plot_simplex(neutral_edges = [1, 2, 3], plot_neutral_dots = true) isa Plots.Plot
+    @test plot_simplex(neutral_edges = [2], plot_neutral_dots = false) isa Plots.Plot
+    @test plot_simplex(neutral_edges = Int[]) isa Plots.Plot
+end
+
 @testset "generate_simplex_grid tests" begin
     grid_points = generate_simplex_grid(10)
     @test all(sum.(grid_points) .≈ 1.0)

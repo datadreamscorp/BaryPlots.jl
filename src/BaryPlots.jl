@@ -104,9 +104,9 @@ Plots an equilateral triangle representing the simplex for three strategies. Opt
 # Arguments
 - `labels`: A vector of three strings labeling the corners of the simplex. Default: `["Strategy 1", "Strategy 2", "Strategy 3"]`.
 - `neutral_edges`: A vector of integers indicating which edges are neutral. Edges are indexed as:
-    - `1`: Edge between Strategy 1 and Strategy 2
-    - `2`: Edge between Strategy 2 and Strategy 3
-    - `3`: Edge between Strategy 3 and Strategy 1
+    - `1`: Edge between Strategy 1 and Strategy 2 (the bottom edge)
+    - `2`: Edge between Strategy 1 and Strategy 3 (the right edge)
+    - `3`: Edge between Strategy 2 and Strategy 3 (the left edge)
 - `plot_neutral_dots`: If `true`, draws a sequence of white dots on each specified neutral edge to visually mark them. Default: `false`.
 - `p`: An existing `Plots.Plot` object to draw on. If `nothing`, a new plot is created.
 - `dpi`: Resolution for the plot. Default: `300`.
@@ -239,9 +239,9 @@ Identifies "neutral" edges in the simplex under the given payoff functions. An e
 
 # Returns
 - A vector of edge indices `{1,2,3}`, each corresponding to:
-  - `1`: Edge between Strategy 1 and Strategy 2
-  - `2`: Edge between Strategy 2 and Strategy 3
-  - `3`: Edge between Strategy 3 and Strategy 1
+  - `1`: Edge between Strategy 1 and Strategy 2 (the bottom edge)
+  - `2`: Edge between Strategy 1 and Strategy 3 (the right edge)
+  - `3`: Edge between Strategy 2 and Strategy 3 (the left edge)
 
 # Notes
 - This function is used inside `plot_evolution` to highlight edges where the game exhibits neutral stability. 
@@ -932,7 +932,10 @@ Simulates replicator dynamics trajectories within a 3-strategy simplex, locates 
                 abs(x_eq[3]) < zero_tol])
                 is_vertex = num_zero >= 2
 
-                # If equilibrium is on a neutral edge and is unstable, skip plotting
+                # Equilibria sitting on a neutral edge are not drawn individually,
+                # regardless of stability: the whole edge is a line of equilibria, so
+                # marking one interior point would misrepresent it. Vertices are still
+                # drawn, since those are meaningful on their own.
                 if !( (edge_idx != 0 && edge_idx in neutral_edges) ) || is_vertex
 
                     if is_stable

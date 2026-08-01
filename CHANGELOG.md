@@ -95,8 +95,20 @@ the `plot_evolution` keyword surface.
   defaults to `2`. The `plot_evolution` and `plot_simplex` docstring signature blocks had also
   drifted out of sync with the real signatures.
 
-- **README fix:** the parameter list documented a `cbar` option; the actual keyword is
-  `colorbar`.
+- **Neutral edge indices were documented wrongly.** Both `identify_neutral_edges` and
+  `plot_simplex` described index `2` as the Strategy 2 ↔ 3 edge and index `3` as Strategy 3 ↔ 1.
+  The code pairs them as `(2,1), (1,3), (3,2)`, so the correct mapping is `1` = {1,2} (bottom),
+  `2` = {1,3} (right), `3` = {2,3} (left). Anyone passing `neutral_edges` to `plot_simplex` by
+  hand was marking the wrong edge. The mapping is now covered by tests.
+
+- **Corrected a misleading source comment** claiming equilibria on a neutral edge are skipped
+  only when unstable. The condition never tested stability: all such equilibria are suppressed
+  unless they sit at a vertex. Behaviour is unchanged; only the comment was wrong.
+
+- **README fixes:** the parameter list documented a `cbar` option when the actual keyword is
+  `colorbar`, and neutral edge detection — automatic in `plot_evolution` since well before this
+  release — was not documented at all. It now has its own section, with a worked example and a
+  figure, as does basin plotting (`images/neutral_edges.png` and `images/basins.png`).
 
 - Removed a dead conditional in `plot_evolution` whose two branches were identical.
 
@@ -107,7 +119,7 @@ the `plot_evolution` keyword surface.
 - `Manifest.toml` is no longer tracked. BaryPlots is a library: consumers resolve their own
   environments from `Project.toml`, so a committed lockfile was never read by them and only
   went stale.
-- Test suite expanded from 17 to 28 testsets, covering the coordinate helpers, basin
+- Test suite expanded from 17 to 30 testsets, covering the coordinate helpers, basin
   classification, the error-handling contract, numeric-type flexibility and the retained
   positional call forms.
 
