@@ -30,6 +30,270 @@ end
     @test all( isapprox.(ternary_coords([1.0 - 1e-10, 1e-10, 0.0]), [1.0, 0.0]; atol=1e-8) )
 end
 
+@testset "inverse_ternary_coords tests" begin
+    # Corners
+    @test isapprox(inverse_ternary_coords(1.0, 0.0), [1.0, 0.0, 0.0]; atol=1e-12)
+    @test isapprox(inverse_ternary_coords(0.0, 0.0), [0.0, 1.0, 0.0]; atol=1e-12)
+    @test isapprox(inverse_ternary_coords(0.5, sqrt(3)/2), [0.0, 0.0, 1.0]; atol=1e-12)
+    # Centroid
+    @test isapprox(inverse_ternary_coords(0.5, sqrt(3)/6), [1/3, 1/3, 1/3]; atol=1e-12)
+end
+
+@testset "inverse_ternary_coords round-trip tests" begin
+    test_points = [
+        [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0],
+        [0.5, 0.5, 0.0], [0.0, 0.5, 0.5], [0.5, 0.0, 0.5],
+        [1/3, 1/3, 1/3], [0.6, 0.3, 0.1], [0.15, 0.05, 0.8],
+    ]
+    for x in test_points
+        X, Y = ternary_coords(x)
+        @test isapprox(inverse_ternary_coords(X, Y), x; atol=1e-12)
+        # Recovered coordinates are a valid distribution
+        @test isapprox(sum(inverse_ternary_coords(X, Y)), 1.0; atol=1e-12)
+    end
+end
+
+@testset "inverse_ternary_coords outside-simplex tests" begin
+    # Points in the bounding box but outside the triangle must have a negative component
+    @test any(inverse_ternary_coords(0.05, sqrt(3)/2 - 0.05) .< 0)  # above the left edge
+    @test any(inverse_ternary_coords(0.95, sqrt(3)/2 - 0.05) .< 0)  # above the right edge
+    # Components still sum to 1 even outside the simplex
+    @test isapprox(sum(inverse_ternary_coords(0.05, sqrt(3)/2 - 0.05)), 1.0; atol=1e-12)
+end
+
+# Basin of attraction tests.
+#
+# The game wᵢ(x) = xᵢ makes every strategy do best when it is common, so all three
+# vertices are stable and the replicator dynamics carry any interior point to the
+# vertex with the largest initial frequency. That gives an exact prediction for the
+# basin labels: argmax(x0).
+
+@testset "classify_basin tests" begin
+    coord_payoff_1(x, t, params) = x[1]
+    coord_payoff_2(x, t, params) = x[2]
+    coord_payoff_3(x, t, params) = x[3]
+
+    params = ReplicatorParams((coord_payoff_1, coord_payoff_2, coord_payoff_3), NamedTuple())
+    stable_eq_points = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    tspan = (0.0, 100.0)
+
+    # Each initial condition flows to the vertex it is closest to dominating
+    @test BaryPlots.classify_basin([0.6, 0.2, 0.2], params, stable_eq_points, tspan) == 1
+    @test BaryPlots.classify_basin([0.2, 0.6, 0.2], params, stable_eq_points, tspan) == 2
+    @test BaryPlots.classify_basin([0.2, 0.2, 0.6], params, stable_eq_points, tspan) == 3
+    @test BaryPlots.classify_basin([0.45, 0.4, 0.15], params, stable_eq_points, tspan;
+                                   steady_state_tol = 1e-6) == 1
+
+    # Starting at a stable equilibrium stays there
+    @test all(
+        BaryPlots.classify_basin(copy(eq), params, stable_eq_points, tspan) == i
+        for (i, eq) in enumerate(stable_eq_points)
+    )
+
+    # No stable equilibria supplied => label 0
+    @test BaryPlots.classify_basin([0.6, 0.2, 0.2], params, Vector{Vector{Float64}}(), tspan) == 0
+end
+
+@testset "classify_basin outside-all-basins tests" begin
+    coord_payoff_1(x, t, params) = x[1]
+    coord_payoff_2(x, t, params) = x[2]
+    coord_payoff_3(x, t, params) = x[3]
+
+    params = ReplicatorParams((coord_payoff_1, coord_payoff_2, coord_payoff_3), NamedTuple())
+    tspan = (0.0, 100.0)
+
+    # Only vertex 1 is declared stable, but [0.2, 0.6, 0.2] flows to vertex 2.
+    # With a single stable point supplied, the "outside all basins" label is n+1 = 2.
+    n = 1
+    @test BaryPlots.classify_basin(
+        [0.2, 0.6, 0.2], params, [[1.0, 0.0, 0.0]], tspan
+    ) == n + 1
+    @test BaryPlots.classify_basin(
+        [0.6, 0.2, 0.2], params, [[1.0, 0.0, 0.0]], tspan
+    ) == 1
+end
+
+@testset "classify_basin error handling tests" begin
+    stable_eq_points = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    tspan = (0.0, 100.0)
+
+    # A DomainError from the payoff functions is a numerical failure: report the point
+    # as unclassified rather than aborting the whole basin sweep.
+    domain_1(x, t, params) = throw(DomainError(x[1], "boom"))
+    domain_rest(x, t, params) = 0.0
+    domain_params = ReplicatorParams((domain_1, domain_rest, domain_rest), NamedTuple())
+    @test BaryPlots.classify_basin(
+        [0.6, 0.2, 0.2], domain_params, stable_eq_points, tspan
+    ) == 0
+
+    # Any other exception is a bug and must propagate, not be relabelled as 0.
+    # (This is what previously hid a genuine UndefVarError behind a `0` label.)
+    bug_1(x, t, params) = params.nonexistent_field
+    bug_rest(x, t, params) = 0.0
+    bug_params = ReplicatorParams((bug_1, bug_rest, bug_rest), NamedTuple())
+    @test_throws Exception BaryPlots.classify_basin(
+        [0.6, 0.2, 0.2], bug_params, stable_eq_points, tspan
+    )
+end
+
+@testset "basin_label_grid tests" begin
+    coord_payoff_1(x, t, params) = x[1]
+    coord_payoff_2(x, t, params) = x[2]
+    coord_payoff_3(x, t, params) = x[3]
+
+    params = ReplicatorParams((coord_payoff_1, coord_payoff_2, coord_payoff_3), NamedTuple())
+    stable_eq_points = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    tspan = (0.0, 100.0)
+    res = 11
+
+    xs, ys, Z = BaryPlots.basin_label_grid(
+        params, stable_eq_points, tspan; resolution = res
+    )
+
+    # Shapes and ranges
+    @test length(xs) == res
+    @test length(ys) == res
+    @test size(Z) == (res, res)
+    @test isapprox(first(xs), 0.0) && isapprox(last(xs), 1.0)
+    @test isapprox(first(ys), 0.0) && isapprox(last(ys), sqrt(3)/2)
+
+    # Labels are 0 (outside the simplex) or a valid basin index
+    @test all(0 .<= Z .<= length(stable_eq_points) + 1)
+
+    # Points outside the simplex are unlabelled, points inside are labelled
+    @test all(
+        (all(inverse_ternary_coords(X, Y) .>= -1e-8)) == (Z[ix, iy] != 0)
+        for (ix, X) in enumerate(xs), (iy, Y) in enumerate(ys)
+    )
+
+    # The top corners of the grid lie outside the simplex
+    @test Z[1, res] == 0    # (X=0, Y=√3/2): above the left edge
+    @test Z[res, res] == 0  # (X=1, Y=√3/2): above the right edge
+
+    # Interior labels match the argmax prediction. Skip the boundary, where argmax is
+    # ambiguous, and near-ties, where the trajectory can land either way.
+    interior = [
+        (Z[ix, iy], argmax(inverse_ternary_coords(X, Y)))
+        for (ix, X) in enumerate(xs), (iy, Y) in enumerate(ys)
+        if let x = inverse_ternary_coords(X, Y), s = sort(inverse_ternary_coords(X, Y); rev = true)
+            all(x .>= 1e-3) && s[1] - s[2] > 1e-2
+        end
+    ]
+    @test !isempty(interior)
+    @test all(label == predicted for (label, predicted) in interior)
+end
+
+@testset "plot_evolution basin plotting tests" begin
+    coord_payoff_1(x, t, params) = x[1]
+    coord_payoff_2(x, t, params) = x[2]
+    coord_payoff_3(x, t, params) = x[3]
+
+    payoffs = (coord_payoff_1, coord_payoff_2, coord_payoff_3)
+    x0_list = [[0.6, 0.2, 0.2], [0.2, 0.6, 0.2]]
+    tspan = (0.0, 50.0)
+
+    # Separatrix only
+    p = plot_evolution(payoffs, x0_list, tspan;
+        plot_basins = true, basin_resolution = 9,
+        equilibria_kwargs = (num_initial_guesses = 100,))
+    @test p isa Plots.Plot
+
+    # Separatrix plus shading
+    p_shaded = plot_evolution(payoffs, x0_list, tspan;
+        plot_basins = true, basin_shade = true, basin_resolution = 9,
+        basin_alpha = 0.2, equilibria_kwargs = (num_initial_guesses = 100,))
+    @test p_shaded isa Plots.Plot
+end
+
+@testset "plot_evolution basin warning tests" begin
+    # Rock-Paper-Scissors has no stable equilibrium, so basin plotting is skipped
+    rps_payoff_R(x, t, params) = -x[2] + x[3]
+    rps_payoff_P(x, t, params) = x[1] - x[3]
+    rps_payoff_S(x, t, params) = -x[1] + x[2]
+
+    p = @test_logs (:warn,) match_mode=:any plot_evolution(
+        (rps_payoff_R, rps_payoff_P, rps_payoff_S),
+        [[0.4, 0.4, 0.2]],
+        (0.0, 20.0);
+        plot_basins = true, basin_resolution = 8,
+        equilibria_kwargs = (num_initial_guesses = 100,),
+    )
+    @test p isa Plots.Plot
+end
+
+@testset "integer and rational input tests" begin
+    # Any numeric type that converts unambiguously to a float should be accepted
+    @test isapprox(inverse_ternary_coords(0, 0), [0.0, 1.0, 0.0]; atol=1e-12)
+    @test isapprox(inverse_ternary_coords(1//2, 0), [0.5, 0.5, 0.0]; atol=1e-12)
+    @test all(isapprox.(ternary_coords([1, 0, 0]), (1.0, 0.0); atol=1e-12))
+
+    coord_payoff_1(x, t, params) = x[1]
+    coord_payoff_2(x, t, params) = x[2]
+    coord_payoff_3(x, t, params) = x[3]
+
+    payoffs = (coord_payoff_1, coord_payoff_2, coord_payoff_3)
+    params = ReplicatorParams(payoffs, NamedTuple())
+
+    # Integer initial condition, integer stable equilibria, integer tspan.
+    # [3, 1, 1] does not sum to 1; classify_basin normalises it onto the simplex.
+    @test BaryPlots.classify_basin(
+        [3, 1, 1], params, [[1, 0, 0], [0, 1, 0], [0, 0, 1]], (0, 100)
+    ) == 1
+
+    # Integer tolerances and grid resolution
+    xs, ys, Z = BaryPlots.basin_label_grid(
+        params, [[1, 0, 0], [0, 1, 0], [0, 0, 1]], (0, 100);
+        resolution = Int32(7), steady_state_tol = 1//1000000, convergence_tol = 1//10,
+    )
+    @test size(Z) == (7, 7)
+    @test eltype(xs) == Float64
+
+    # Integer styling and time span through the top-level plotting function
+    p = plot_evolution(payoffs, [[1, 1, 2]], (0, 20);
+        markersize = 10, markerstrokewidth = 2, trajectory_linewidth = 3,
+        triangle_linewidth = 1, steady_state_tol = 1//1000000,
+        equilibria_kwargs = (num_initial_guesses = 50,))
+    @test p isa Plots.Plot
+
+    # check_stability and find_equilibria with integer input / tolerances
+    @test check_stability([0, 0, 1], params) isa Bool
+    eqs, stab = find_equilibria(payoffs; num_initial_guesses = 50, stability_tol = 1//1000000)
+    @test length(eqs) == length(stab)
+end
+
+@testset "API surface tests" begin
+    coord_payoff_1(x, t, params) = x[1]
+    coord_payoff_2(x, t, params) = x[2]
+    coord_payoff_3(x, t, params) = x[3]
+    payoffs = (coord_payoff_1, coord_payoff_2, coord_payoff_3)
+
+    # find_equilibria: keyword form and the deprecated positional form agree
+    eqs_kw, stab_kw = find_equilibria(payoffs; num_initial_guesses = 20)
+    eqs_pos, stab_pos = find_equilibria(payoffs, NamedTuple(); num_initial_guesses = 20)
+    @test length(eqs_kw) == length(stab_kw)
+    @test length(eqs_pos) == length(stab_pos)
+
+    # extra_params reaches the payoff functions through the keyword
+    scaled_1(x, t, params) = params.a * x[1]
+    scaled_rest(x, t, params) = 0.0
+    eqs_extra, _ = find_equilibria((scaled_1, scaled_rest, scaled_rest);
+        extra_params = (a = 2.0,), num_initial_guesses = 20)
+    @test !isempty(eqs_extra)
+
+    # generate_simplex_grid: keyword and positional margin agree
+    @test generate_simplex_grid(10; margin = 2) == generate_simplex_grid(10, 2)
+    @test generate_simplex_grid(10) == generate_simplex_grid(10; margin = 1)
+
+    # equilibria_kwargs is forwarded to find_equilibria
+    p = plot_evolution(payoffs, [[0.5, 0.3, 0.2]], (0.0, 10.0);
+        equilibria_kwargs = (num_initial_guesses = 20, stability_tol = 1e-8))
+    @test p isa Plots.Plot
+
+    # contour_levels was removed
+    @test_throws MethodError plot_evolution(payoffs, [[0.5, 0.3, 0.2]], (0.0, 10.0);
+        contour_levels = 10)
+end
+
 @testset "replicator_dynamics tests" begin
     # Constant payoff functions that don't depend on strategy or time
     payoff1(x, t, params) = 1.0

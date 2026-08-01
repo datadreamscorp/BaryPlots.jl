@@ -1,0 +1,12 @@
+# Resolved dependency lockfile. BaryPlots is a library, not an application: consumers
+# resolve their own environment from Project.toml's [deps] and [compat], so a committed
+# Manifest is never read by them and only goes stale. It is still generated locally for
+# development and regenerates on `Pkg.instantiate()`.
+Manifest.toml
+
+# Julia build and coverage artifacts
+/docs/build/
+/docs/site/
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
