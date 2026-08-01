@@ -295,34 +295,53 @@ plot_evolution(
 
 ### Example 4: Basins of Attraction
 
+<img src="./images/basins.png" alt="" width="300"/>
+
 When a game has more than one stable equilibrium, `plot_basins = true` classifies every point
 of the simplex by which equilibrium it flows to, and draws the separatrix between the resulting
-basins. In this coordination game each strategy does best when it is common, so all three
-vertices are stable and the simplex splits into three basins.
+basins. This is a pure coordination game — each convention pays off in proportion to how many
+already use it — so all three vertices are stable and the simplex splits into three basins meeting
+at the centre. Stable equilibria are the filled circles at the vertices; the hollow circles are the
+unstable equilibria on the separatrices.
 
 ```julia
 
-# Each strategy does best when it is common
-coord_payoff_1(x, t, params) = x[1]
-coord_payoff_2(x, t, params) = x[2]
-coord_payoff_3(x, t, params) = x[3]
+# Each convention pays off in proportion to how many already use it
+coord_A(x, t, params) = x[1]
+coord_B(x, t, params) = x[2]
+coord_C(x, t, params) = x[3]
 
 plot_evolution(
-    (coord_payoff_1, coord_payoff_2, coord_payoff_3),
-    [ [0.6, 0.2, 0.2], [0.2, 0.6, 0.2], [0.2, 0.2, 0.6] ],
-    (0.0, 100.0);
-    labels = [L"A", L"B", L"C"],
+    (coord_A, coord_B, coord_C),
+    [ [0.50, 0.30, 0.20], [0.20, 0.50, 0.30], [0.30, 0.20, 0.50],
+      [0.40, 0.35, 0.25], [0.25, 0.40, 0.35], [0.35, 0.25, 0.40] ],
+    (0.0, 300.0);
+    labels = [L"\mathrm{Convention\ A}", L"\mathrm{Convention\ B}", L"\mathrm{Convention\ C}"],
+    steady_state_tol = 1e-12,
+    arrow_list = [[250], [250], [250], [250], [250], [250]],
     plot_basins = true,
     basin_shade = true,       # fill the basins as well as drawing the separatrix
-    basin_resolution = 100,
-    basin_alpha = 0.3,
+    basin_resolution = 500,
+    basin_alpha = 0.25,
+    basin_boundary_linestyle = :solid,
 )
 
 ```
 
+The colored fills are optional. `plot_basins = true` on its own draws only the dashed separatrices;
+the shading appears because `basin_shade = true` was passed. When it is on, each basin takes a
+color from the `:tab10` palette unless you override `basin_colors`, and `basin_alpha` controls how
+strong the fill is.
+
 Basin classification runs one ODE solve per grid point, so cost grows with the *square* of
-`basin_resolution`: at `100` that is roughly 4,300 solves, and at `500` roughly 108,000. Start
-low while composing a figure and raise the resolution only for the final render.
+`basin_resolution`: at `100` that is roughly 4,300 solves, at `300` roughly 39,000, and at `500`
+(used above) roughly 108,000. Start low while composing a figure and raise the resolution only for
+the final render.
+
+One interaction to be aware of: the separatrix is drawn as a contour, so a finer grid produces many
+more, much shorter segments. The default `:dash` style breaks up into faint dots at high
+resolution, which is why the figure above passes `basin_boundary_linestyle = :solid`. At
+`basin_resolution` around `100`–`150` the dashed default reads well.
 
 `plot_basins` also works with a single stable equilibrium — the separatrix then divides its
 basin from the region that flows to unstable boundary points. Points that converge to no stable
@@ -363,6 +382,89 @@ The `plot_evolution` function automatically calculates the equilibria of the sys
 
 Set `plot_basins = true` to additionally shade each stable equilibrium's basin of attraction and
 draw the separatrices between them.
+
+### Neutral Edges
+
+<img src="./images/neutral_edges.png" alt="" width="300"/>
+
+An edge of the simplex is *neutral* when the two strategies bounding it earn identical payoffs
+everywhere along it — no mix of those two is favoured over any other, so the whole edge is a line
+of equilibria rather than a flow toward one point.
+
+`plot_evolution` detects these automatically. Before plotting it calls `identify_neutral_edges`,
+which samples each edge and marks it neutral if `|wᵢ - wⱼ| < tol` at every sample. Neutral edges
+are drawn as a line of white dots instead of a solid black edge, and equilibria detected along one
+are not marked individually unless they sit at a vertex — on a line of equilibria, singling out an
+interior point would misrepresent it.
+
+The figure above shows the effect. Naive and Discriminating cooperators both earn 2 from any
+cooperator, so while Defectors are absent the two are indistinguishable and the whole bottom edge
+is a line of equilibria — drawn as white dots. They separate only once Defectors appear: the Naive
+are exploited, the Discriminating refuse and salvage a little. Each trajectory therefore arcs
+upward as Defectors briefly thrive, then falls back and comes to rest at a *different* point along
+the neutral edge, depending on how many Naive were lost on the way.
+
+```julia
+
+# Both cooperator types earn 2 from any cooperator; they differ only against Defectors
+naive(x, t, params)         = 2 * x[1] + 2 * x[2] + 0 * x[3]
+discriminator(x, t, params) = 2 * x[1] + 2 * x[2] + 1 * x[3]
+defector(x, t, params)      = 3 * x[1] + 1 * x[2] + 1 * x[3]
+
+payoffs = (naive, discriminator, defector)
+
+# The Naive/Discriminator edge is detected as neutral
+identify_neutral_edges(ReplicatorParams(payoffs, NamedTuple()))   # -> [1]
+
+plot_evolution(
+    payoffs,
+    [ [0.60, 0.35, 0.05], [0.55, 0.30, 0.15], [0.50, 0.25, 0.25],
+      [0.45, 0.20, 0.35], [0.40, 0.10, 0.50], [0.35, 0.05, 0.60] ],
+    (0.0, 300.0);
+    labels = [L"\mathrm{Naive}", L"\mathrm{Discriminator}", L"\mathrm{Defector}"],
+    steady_state_tol = 1e-12,
+    arrow_list = [[400], [400], [400], [400], [400], [400]],
+    equilibria_kwargs = (equilibrium_tol = 0.05,),
+)
+
+```
+
+Edges are indexed by the pair of strategies they connect:
+
+| Index | Strategies | Position |
+|-------|------------|----------|
+| `1`   | 1 and 2    | bottom   |
+| `2`   | 1 and 3    | right    |
+| `3`   | 2 and 3    | left     |
+
+`identify_neutral_edges` accepts `tol` (payoff difference below which two strategies count as
+equal, default `1e-8`) and `samples` (points tested per edge, default `100`). Games whose payoffs
+are equal only approximately — through floating-point drift, or a parameter that nearly cancels —
+need a looser `tol` to be recognised.
+
+Note that `plot_evolution` calls `identify_neutral_edges` with its defaults and does not currently
+expose `tol` or `samples`. To use a different tolerance, call `identify_neutral_edges` yourself and
+pass the result to `plot_simplex` via its `neutral_edges` keyword.
+
+One caveat when a neutral edge is present: the edge is a *continuum* of equilibria, so
+`find_equilibria` returns a great many points along it — several hundred at the default
+`equilibrium_tol` for the game above. Those on the edge are suppressed, but any that fall within
+`1e-2` of a vertex are classified as vertices and drawn on top of the real vertex marker, slightly
+offset. Passing a looser tolerance through `equilibria_kwargs` (as above) collapses them into the
+genuine vertices.
+
+`plot_simplex` takes the same indices directly, which is useful for drawing a bare simplex with
+edges marked by hand:
+
+```julia
+
+plot_simplex(
+    labels = ["A", "B", "C"],
+    neutral_edges = [1, 3],
+    plot_neutral_dots = true,
+)
+
+```
 
 ### Coordinate Helpers
 
