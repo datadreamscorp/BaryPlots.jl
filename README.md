@@ -35,34 +35,41 @@ The `plot_evolution` function simulates and plots the evolution of strategy freq
 plot_evolution(
         payoff_functions::Tuple{Function, Function, Function},
         x0_list::Vector{<:AbstractVector{<:Real}},
-        tspan::Tuple{Float64, Float64};
+        tspan::Tuple{Real, Real};
         labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"],
         extra_params::NamedTuple = NamedTuple(),
-        steady_state_tol::Float64 = 1e-6,
+        steady_state_tol::Real = 1e-6,
         arrow_list::Vector{Vector{Int}} = Vector{Vector{Int}}(),
         trajectory_labels::Vector{String} = String[],
         trajectory_colors::AbstractVector = Any[],
-        trajectory_linewidth::Int = 2,
-        num_initial_guesses::Int = 1000,
-        solver_tol::Float64 = 1e-8,
-        equilibrium_tol::Float64 = 1e-5,
-        validity_tol::Float64 = 1e-6,
-        stability_tol::Float64 = 1e-6,
-        markersize::Int = 9,
-        markerstrokewidth::Int = 2,
+        trajectory_linewidth::Real = 2,
+        equilibria_kwargs::NamedTuple = (;),
+        markersize::Real = 9,
+        markerstrokewidth::Real = 1.0,
         colored_trajectories::Bool = false,
         contour::Bool = false,
         contour_color::Symbol = :roma,
-        contour_resolution::Int = 150,
-        contour_levels::Int = 10,
+        contour_resolution::Integer = 150,
         colorbar::Bool = false,
-        triangle_linewidth::Int = 2,
+        triangle_linewidth::Real = 2,
         legend::Bool = false,
-        margin::Int = 2,
-        dpi::Int = 300,
+        margin::Integer = 2,
+        dpi::Integer = 300,
+        plot_basins::Bool = false,
+        basin_resolution::Integer = 100,
+        basin_convergence_tol::Real = 0.1,
+        basin_shade::Bool = false,
+        basin_colors::AbstractVector = [],
+        basin_alpha::Real = 0.3,
+        basin_boundary_color = :black,
+        basin_boundary_linewidth::Real = 2,
+        basin_boundary_linestyle::Symbol = :dash,
     )::Plots.Plot
 
 ```
+
+Numeric arguments accept any real type that converts unambiguously to a float, so
+`markersize = 10`, `tspan = (0, 100)` and `steady_state_tol = 1//1000000` all work.
 
 #### Parameters:
 
@@ -86,15 +93,9 @@ plot_evolution(
     
     trajectory_linewidth: Line width for the trajectory lines.
     
-    num_initial_guesses: Number of initial guesses to use when finding equilibria.
-    
-    solver_tol: Tolerance for the numerical solver when finding equilibria.
-    
-    equilibrium_tol: Tolerance for determining when a point is an equilibrium.
-    
-    validity_tol: Tolerance for validating equilibrium points within the simplex.
-    
-    stability_tol: Tolerance for stability analysis of equilibria.
+    equilibria_kwargs: A NamedTuple forwarded verbatim to find_equilibria. Accepts
+        num_initial_guesses, solver_tol, equilibrium_tol, validity_tol and stability_tol,
+        e.g. equilibria_kwargs = (num_initial_guesses = 200, equilibrium_tol = 1e-3).
     
     markersize: Size of equilibrium markers.
     
@@ -106,9 +107,7 @@ plot_evolution(
     
     contour_resolution: Resolution of the contour plot grid.
     
-    contour_levels: Number of contour levels in the contour plot.
-    
-    cbar: Boolean flag to include a color bar in the contour plot.
+    colorbar: Boolean flag to include a color bar in the contour plot.
     
     triangle_linewidth: Line width for the simplex triangle.
     
@@ -117,6 +116,22 @@ plot_evolution(
     margin: Margin to exclude points near the boundaries in the contour plot.
     
     dpi: Dots per inch for the plot resolution.
+    
+    plot_basins: Draw the basins of attraction and their separatrices. See below.
+    
+    basin_resolution: Grid resolution used to classify basins.
+    
+    basin_convergence_tol: How close a trajectory must land to a stable equilibrium to
+        count as having converged to it.
+    
+    basin_shade: Fill each basin with a translucent color as well as drawing the separatrix.
+    
+    basin_colors: Colors for each basin. Auto-selected from :tab10 if empty.
+    
+    basin_alpha: Transparency of the basin shading.
+    
+    basin_boundary_color / basin_boundary_linewidth / basin_boundary_linestyle: Styling
+        for the separatrix line.
 
 
 ### Example 1: Basic Hawk-Dove Dynamics
@@ -273,10 +288,46 @@ plot_evolution(
     extra_params = params,
     colored_trajectories = true,
     arrow_list = [ [500, 1000], [500, 1000], [200] ],
-    equilibrium_tol = 1e-3
+    equilibria_kwargs = (equilibrium_tol = 1e-3,)
 )
 
 ```
+
+### Example 4: Basins of Attraction
+
+When a game has more than one stable equilibrium, `plot_basins = true` classifies every point
+of the simplex by which equilibrium it flows to, and draws the separatrix between the resulting
+basins. In this coordination game each strategy does best when it is common, so all three
+vertices are stable and the simplex splits into three basins.
+
+```julia
+
+# Each strategy does best when it is common
+coord_payoff_1(x, t, params) = x[1]
+coord_payoff_2(x, t, params) = x[2]
+coord_payoff_3(x, t, params) = x[3]
+
+plot_evolution(
+    (coord_payoff_1, coord_payoff_2, coord_payoff_3),
+    [ [0.6, 0.2, 0.2], [0.2, 0.6, 0.2], [0.2, 0.2, 0.6] ],
+    (0.0, 100.0);
+    labels = [L"A", L"B", L"C"],
+    plot_basins = true,
+    basin_shade = true,       # fill the basins as well as drawing the separatrix
+    basin_resolution = 100,
+    basin_alpha = 0.3,
+)
+
+```
+
+Basin classification runs one ODE solve per grid point, so cost grows with the *square* of
+`basin_resolution`: at `100` that is roughly 4,300 solves, and at `500` roughly 108,000. Start
+low while composing a figure and raise the resolution only for the final render.
+
+`plot_basins` also works with a single stable equilibrium — the separatrix then divides its
+basin from the region that flows to unstable boundary points. Points that converge to no stable
+equilibrium are left unshaded. If the game has no stable equilibrium at all (Rock-Paper-Scissors,
+for instance), basin plotting is skipped with a warning.
 
 ### Customization Options
 
@@ -294,9 +345,9 @@ You can customize several aspects of the plot, including the colors of the traje
     
     contour_resolution: Adjust the resolution of the contour plot grid.
     
-    contour_levels: Set the number of contour levels in the contour plot.
-    
     colorbar: Include a color bar in the contour plot by setting this flag to true.
+    
+    plot_basins: Shade the basins of attraction and draw their separatrices.
     
     triangle_linewidth: Adjust the line width of the simplex triangle.
     
@@ -310,6 +361,24 @@ You can customize several aspects of the plot, including the colors of the traje
 
 The `plot_evolution` function automatically calculates the equilibria of the system and determines whether each equilibrium is stable. Stable equilibria are marked with filled black circles, while unstable equilibria are marked with hollow circles.
 
+Set `plot_basins = true` to additionally shade each stable equilibrium's basin of attraction and
+draw the separatrices between them.
+
+### Coordinate Helpers
+
+`ternary_coords` maps a strategy frequency vector `[x₁, x₂, x₃]` to plot coordinates `(X, Y)`,
+and `inverse_ternary_coords` maps back:
+
+```julia
+
+X, Y = ternary_coords([0.5, 0.3, 0.2])
+inverse_ternary_coords(X, Y)   # ≈ [0.5, 0.3, 0.2]
+
+```
+
+Points outside the triangle come back with at least one negative component, which is how basin
+classification skips them.
+
 ### License
 
 This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
@@ -318,7 +387,7 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 
 This package makes use of several outstanding Julia packages:
 
-- **[DifferentialEquations.jl](https://github.com/SciML/DifferentialEquations.jl)**
+- **[OrdinaryDiffEq.jl](https://github.com/SciML/OrdinaryDiffEq.jl)** and **[SciMLBase.jl](https://github.com/SciML/SciMLBase.jl)**
 - **[ForwardDiff.jl](https://github.com/JuliaDiff/ForwardDiff.jl)**
 - **[Plots.jl](https://github.com/JuliaPlots/Plots.jl)**
 - **[NLsolve.jl](https://github.com/JuliaNLSolvers/NLsolve.jl)**

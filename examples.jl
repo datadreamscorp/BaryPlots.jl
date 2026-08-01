@@ -144,7 +144,43 @@ begin
 	    extra_params = params,
 	    colored_trajectories = true,
 	    arrow_list = [ [500, 1000], [500, 1000], [200] ],
-	    equilibrium_tol = 1e-3
+	    equilibria_kwargs = (equilibrium_tol = 1e-3,)
+	)
+end
+
+# ╔═╡ 3f9c1d02-7ab4-4e51-9c3d-1e5a7b8c2d40
+md"""
+### Example 4: Basins of Attraction
+
+Each strategy does best when it is common, so all three vertices are stable and the
+simplex splits into three basins of attraction. `plot_basins = true` classifies every
+grid point by which equilibrium it flows to and draws the separatrices between them.
+
+Cost grows with the square of `basin_resolution` (one ODE solve per grid point), so
+keep it low while composing and raise it only for a final render.
+"""
+
+# ╔═╡ 5b2e8a71-4c3f-4d92-b6e1-8a7c9f0d3e21
+begin
+	# Each strategy does best when it is common
+	coord_payoff_1(x, t, params) = x[1]
+	coord_payoff_2(x, t, params) = x[2]
+	coord_payoff_3(x, t, params) = x[3]
+
+	p4 = plot_evolution(
+	    (coord_payoff_1, coord_payoff_2, coord_payoff_3),
+	    [
+	        [0.6, 0.2, 0.2],
+	        [0.2, 0.6, 0.2],
+	        [0.2, 0.2, 0.6]
+	    ],
+	    (0.0, 100.0);
+	    labels = [L"A", L"B", L"C"],
+	    colored_trajectories = true,
+	    plot_basins = true,
+	    basin_shade = true,
+	    basin_resolution = 100,
+	    basin_alpha = 0.3,
 	)
 end
 
@@ -156,3 +192,5 @@ end
 # ╟─d7a877bc-a0e3-42d6-812e-020d9b37647f
 # ╟─f0e4e9f5-1580-476e-a5e8-bc902d52c0e6
 # ╟─218a13ac-f211-445c-8f02-476a1a11ead6
+# ╟─3f9c1d02-7ab4-4e51-9c3d-1e5a7b8c2d40
+# ╟─5b2e8a71-4c3f-4d92-b6e1-8a7c9f0d3e21

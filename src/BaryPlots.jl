@@ -1,13 +1,14 @@
 module BaryPlots
 
-    using DifferentialEquations
+    using OrdinaryDiffEq
+    using SciMLBase: terminate!, successful_retcode
 	using Plots
 	using LinearAlgebra
 	using NLsolve
 	using ForwardDiff
     using LaTeXStrings
 
-    export plot_evolution, ternary_coords, replicator_dynamics!, check_stability, find_equilibria, plot_simplex, ReplicatorParams, generate_simplex_grid, identify_neutral_edges
+    export plot_evolution, ternary_coords, inverse_ternary_coords, replicator_dynamics!, check_stability, find_equilibria, plot_simplex, ReplicatorParams, generate_simplex_grid, identify_neutral_edges
 
 """
     get_vertices() -> Vector{Vector{Float64}}
@@ -87,11 +88,14 @@ for plotting within a simplex (equilateral triangle).
 
 
 """
-    plot_simplex(; 
-        labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"], 
-        neutral_edges::Vector{Int} = Int[], 
-        plot_neutral_dots::Bool = false, 
-        p = nothing, 
+    plot_simplex(;
+        labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"],
+        neutral_edges::Vector{Int} = Int[],
+        plot_neutral_dots::Bool = false,
+        p = nothing,
+        dpi::Integer = 300,
+        markersize::Real = 9,
+        markerstrokewidth::Real = 1.0,
         kwargs...
     ) -> Plots.Plot
 
@@ -105,6 +109,9 @@ Plots an equilateral triangle representing the simplex for three strategies. Opt
     - `3`: Edge between Strategy 3 and Strategy 1
 - `plot_neutral_dots`: If `true`, draws a sequence of white dots on each specified neutral edge to visually mark them. Default: `false`.
 - `p`: An existing `Plots.Plot` object to draw on. If `nothing`, a new plot is created.
+- `dpi`: Resolution for the plot. Default: `300`.
+- `markersize`: Size of the neutral-edge dots. Default: `9`.
+- `markerstrokewidth`: Stroke width of the neutral-edge dots. Default: `1.0`.
 - `kwargs`: Additional keyword arguments passed to `plot` for further customization.
 
 # Returns
@@ -118,8 +125,10 @@ Plots an equilateral triangle representing the simplex for three strategies. Opt
         labels = ["Strategy 1", "Strategy 2", "Strategy 3"], 
         neutral_edges::Vector{Int} = Int[], 
         plot_neutral_dots::Bool = false, 
-        p = nothing, 
-        dpi::Int = 300,
+        p = nothing,
+        dpi::Integer = 300,
+        markersize::Real = 9,
+        markerstrokewidth::Real = 1.0,
         kwargs...)::Plots.Plot
 
         if isnothing(p)
@@ -165,8 +174,8 @@ Plots an equilateral triangle representing the simplex for three strategies. Opt
                         y = y_start + frac * (y_end - y_start)
                         scatter!(p, [x], [y]; 
                             markercolor = :white, 
-                            markersize = 9, 
-                            markerstrokewidth = 2,
+                            markersize = markersize,
+                            markerstrokewidth = markerstrokewidth,
                             label = false)
                     end
                 end
@@ -219,7 +228,7 @@ Holds parameters for the replicator dynamics, including payoff functions and ext
 
 
 """
-    identify_neutral_edges(params::ReplicatorParams; tol::Float64 = 1e-8, samples::Int = 100) -> Vector{Int}
+    identify_neutral_edges(params::ReplicatorParams; tol::Real = 1e-8, samples::Integer = 100) -> Vector{Int}
 
 Identifies "neutral" edges in the simplex under the given payoff functions. An edge is neutral if, for all sampled points on that edge, the payoffs of the two involved strategies are effectively equal.
 
@@ -237,7 +246,7 @@ Identifies "neutral" edges in the simplex under the given payoff functions. An e
 # Notes
 - This function is used inside `plot_evolution` to highlight edges where the game exhibits neutral stability. 
 """
-    function identify_neutral_edges(params::ReplicatorParams; tol::Float64 = 1e-8, samples::Int = 100)::Vector{Int}
+    function identify_neutral_edges(params::ReplicatorParams; tol::Real = 1e-8, samples::Integer = 100)::Vector{Int}
         edges = [(2, 1), (1, 3), (3, 2)]
         neutral_edges = Int[]  # List to store indices of neutral edges
 
@@ -335,9 +344,12 @@ Creates a callback function for use with DifferentialEquations.jl solvers that t
 
 
 """
-    generate_simplex_grid(resolution::Int, margin::Int = 1) -> Vector{Vector{Float64}}
+    generate_simplex_grid(resolution::Integer; margin::Integer = 1) -> Vector{Vector{Float64}}
 
 Generates a list of points within the simplex by discretizing the simplex into a grid, excluding points near the boundaries as specified by the margin.
+
+A positional form `generate_simplex_grid(resolution, margin)` is retained for backwards
+compatibility.
 
 # Arguments
 - `resolution`: The number of divisions along each edge of the simplex. Higher resolution results in more points.
@@ -349,7 +361,7 @@ Generates a list of points within the simplex by discretizing the simplex into a
 # Notes
 - This function is used to generate points for plotting contour plots within the simplex.
 """
-    function generate_simplex_grid(resolution::Int, margin::Int = 1)
+    function generate_simplex_grid(resolution::Integer; margin::Integer = 1)
         points = Vector{Vector{Float64}}()
         for i in margin:(resolution - margin)
             for j in margin:(resolution - i - margin)
@@ -365,11 +377,158 @@ Generates a list of points within the simplex by discretizing the simplex into a
         end
         return points
     end
+
+    # Deprecated positional form retained for backwards compatibility.
+    generate_simplex_grid(resolution::Integer, margin::Integer) =
+        generate_simplex_grid(resolution; margin = margin)
     
 
 
 """
-    compute_average_payoffs(grid_points::Vector{Vector{Float64}}, payoff_functions::Tuple{Function, Function, Function}, params::NamedTuple) -> Vector{Float64}
+    inverse_ternary_coords(X::Real, Y::Real) -> Vector{Float64}
+
+Inverse of `ternary_coords`: given a 2D ternary plot point `(X, Y)`, returns the corresponding
+barycentric coordinate vector `[x₁, x₂, x₃]`. Values outside the simplex will have at least
+one negative component.
+"""
+    function inverse_ternary_coords(X::Real, Y::Real)::Vector{Float64}
+        x3 = 2Y / sqrt(3)
+        x1 = X - Y / sqrt(3)
+        x2 = 1.0 - x1 - x3
+        return [x1, x2, x3]
+    end
+
+
+"""
+    classify_basin(x0, params, stable_eq_points, tspan;
+                   steady_state_tol, convergence_tol, reltol, abstol) -> Int
+
+Integrates the replicator dynamics from initial condition `x0` until convergence and returns the
+1-based index of the nearest stable equilibrium in `stable_eq_points`. `x0` is normalised onto
+the simplex before integration, so it need not already sum to 1.
+
+# Keyword arguments
+- `steady_state_tol`: The integration stops early once the norm of the derivative falls below
+  this value. Default `1e-6`.
+- `convergence_tol`: Maximum distance from a stable equilibrium for the trajectory endpoint to
+  count as having converged to it. Default `0.1`.
+- `reltol`, `abstol`: Solver tolerances passed to `solve`. Both default to `1e-6`.
+
+# Returns
+- `0` if `stable_eq_points` is empty, or if the ODE solve fails — either by returning an
+  unsuccessful `retcode` (instability, dt underflow, max iterations) or by throwing a
+  `DomainError`. Other exceptions propagate rather than being reported as `0`.
+- `1:length(stable_eq_points)` for the nearest stable equilibrium, when the endpoint lies within
+  `convergence_tol` of it.
+- `length(stable_eq_points) + 1` when the endpoint converged to none of them (e.g. it flowed to an
+  unstable boundary point) — the "outside all basins" label.
+"""
+    function classify_basin(
+        x0::AbstractVector{<:Real},
+        params::ReplicatorParams,
+        stable_eq_points::AbstractVector{<:AbstractVector{<:Real}},
+        tspan::Tuple{Real,Real};
+        steady_state_tol::Real = 1e-6,
+        convergence_tol::Real = 0.1,
+        reltol::Real = 1e-6,
+        abstol::Real = 1e-6,
+    )::Int
+        isempty(stable_eq_points) && return 0
+        # The solver mutates the state in place, so it needs a mutable float vector
+        # regardless of what the caller supplied. Normalise onto the simplex as well:
+        # `isoutofdomain` below rejects any component above 1, so an unnormalised
+        # initial condition would never integrate.
+        x0_f = collect(float.(x0))
+        x0_f /= sum(x0_f)
+        tspan_f = (float(tspan[1]), float(tspan[2]))
+        cb = create_steady_state_callback(steady_state_tol)
+        prob = ODEProblem(replicator_dynamics!, x0_f, tspan_f, params)
+        sol = try
+            solve(prob;
+                callback = cb,
+                saveat = [],
+                reltol = reltol, abstol = abstol,
+                isoutofdomain = (u, p, t) -> any(v -> v < -1e-8 || v > 1 + 1e-8, u),
+            )
+        catch err
+            # One pathological grid point should not abort a whole basin sweep, so a
+            # numerical blow-up in the payoff functions is reported as "unclassified".
+            # Anything else (a typo, a missing method, a bad argument) is a genuine bug
+            # and must surface rather than be silently relabelled as `0`.
+            err isa DomainError && return 0
+            rethrow()
+        end
+        # Callback termination counts as success; a solver that gave up early
+        # (instability, dt underflow, max iterations) has told us nothing about
+        # which basin this point belongs to.
+        successful_retcode(sol) || return 0
+        isempty(sol.u) && return 0
+        x_final = clamp.(sol.u[end], 0.0, 1.0)
+        x_final /= sum(x_final)
+        dists = [norm(x_final - eq) for eq in stable_eq_points]
+        min_dist, idx = findmin(dists)
+        # If the trajectory didn't converge near any stable equilibrium (e.g. it
+        # flowed to an unstable vertex), label it as "outside all basins".
+        return min_dist <= convergence_tol ? idx : length(stable_eq_points) + 1
+    end
+
+
+"""
+    basin_label_grid(params, stable_eq_points, tspan;
+                     resolution, steady_state_tol, convergence_tol,
+                     reltol, abstol, simplex_tol) -> (xs, ys, Z)
+
+Builds a rectangular grid over ternary plot space and classifies each point inside the simplex
+by which stable equilibrium it flows to under the replicator dynamics.
+
+# Keyword arguments
+- `resolution`: Number of grid points along each axis. Default `60`. (`plot_evolution` passes
+  its own `basin_resolution`, which defaults to `100`.)
+- `steady_state_tol`: Passed through to [`classify_basin`](@ref). Default `1e-6`.
+- `convergence_tol`: Passed through to [`classify_basin`](@ref). Default `0.1`.
+- `reltol`, `abstol`: Solver tolerances passed through to [`classify_basin`](@ref). Both `1e-6`.
+- `simplex_tol`: Slack allowed on the barycentric coordinates when testing whether a grid point
+  lies inside the simplex. Default `1e-8`.
+
+# Returns
+- `xs`, `ys`: coordinate vectors of length `resolution`
+- `Z`: integer matrix of size `(resolution, resolution)` where `Z[ix,iy]` is the basin label at
+  `(xs[ix], ys[iy])`, or `0` for points outside the simplex. Labels follow
+  [`classify_basin`](@ref): `1:n` for the stable equilibria and `n+1` for "outside all basins".
+"""
+    function basin_label_grid(
+        params::ReplicatorParams,
+        stable_eq_points::AbstractVector{<:AbstractVector{<:Real}},
+        tspan::Tuple{Real,Real};
+        resolution::Integer = 60,
+        steady_state_tol::Real = 1e-6,
+        convergence_tol::Real = 0.1,
+        reltol::Real = 1e-6,
+        abstol::Real = 1e-6,
+        simplex_tol::Real = 1e-8,
+    )::Tuple{Vector{Float64}, Vector{Float64}, Matrix{Int}}
+        xs = collect(range(0.0, 1.0; length = resolution))
+        ys = collect(range(0.0, sqrt(3)/2; length = resolution))
+        Z  = zeros(Int, resolution, resolution)
+        for (ix, X) in enumerate(xs)
+            for (iy, Y) in enumerate(ys)
+                x = inverse_ternary_coords(X, Y)
+                all(x .>= -simplex_tol) || continue
+                x = clamp.(x, 0.0, 1.0)
+                x /= sum(x)
+                Z[ix, iy] = classify_basin(
+                    x, params, stable_eq_points, tspan;
+                    steady_state_tol = steady_state_tol,
+                    convergence_tol = convergence_tol, reltol = reltol, abstol = abstol,
+                )
+            end
+        end
+        return xs, ys, Z
+    end
+
+
+"""
+    compute_average_payoffs(grid_points::AbstractVector{<:AbstractVector{<:Real}}, payoff_functions::Tuple{Function, Function, Function}, params::NamedTuple) -> Vector{Float64}
 
 Computes the average payoff for each point in `grid_points` given the payoff functions and additional parameters.
 
@@ -384,7 +543,7 @@ Computes the average payoff for each point in `grid_points` given the payoff fun
 # Notes
 - The average payoff at each point is calculated as `avg_payoff = x₁*w₁ + x₂*w₂ + x₃*w₃`, where `wᵢ` is the payoff of strategy `i`.
 """
-    function compute_average_payoffs(grid_points::Vector{Vector{Float64}}, payoff_functions::Tuple{Function, Function, Function}, params::NamedTuple)
+    function compute_average_payoffs(grid_points::AbstractVector{<:AbstractVector{<:Real}}, payoff_functions::Tuple{Function, Function, Function}, params::NamedTuple)
         avg_payoffs = []
         for x in grid_points
             w1 = payoff_functions[1](x, 0.0, params)
@@ -399,7 +558,7 @@ Computes the average payoff for each point in `grid_points` given the payoff fun
 
 
 """
-    get_ternary_coordinates(grid_points::Vector{Vector{Float64}}) -> Tuple{Vector{Float64}, Vector{Float64}}
+    get_ternary_coordinates(grid_points::AbstractVector{<:AbstractVector{<:Real}}) -> Tuple{Vector{Float64}, Vector{Float64}}
 
 Converts a list of points in strategy frequency space to their corresponding ternary plot coordinates.
 
@@ -412,7 +571,7 @@ Converts a list of points in strategy frequency space to their corresponding ter
 # Notes
 - Uses `ternary_coords` to compute the coordinates for each point.
 """
-    function get_ternary_coordinates(grid_points::Vector{Vector{Float64}})
+    function get_ternary_coordinates(grid_points::AbstractVector{<:AbstractVector{<:Real}})
         X = []
         Y = []
         for x in grid_points
@@ -429,31 +588,35 @@ Converts a list of points in strategy frequency space to their corresponding ter
     plot_evolution(
         payoff_functions::Tuple{Function, Function, Function},
         x0_list::Vector{<:AbstractVector{<:Real}},
-        tspan::Tuple{Float64, Float64};
+        tspan::Tuple{Real, Real};
         labels::Vector{String} = ["Strategy 1", "Strategy 2", "Strategy 3"],
         extra_params::NamedTuple = NamedTuple(),
-        steady_state_tol::Float64 = 1e-6,
+        steady_state_tol::Real = 1e-6,
         arrow_list::Vector{Vector{Int}} = Vector{Vector{Int}}(),
         trajectory_labels::Vector{String} = String[],
         trajectory_colors::AbstractVector = Any[],
-        trajectory_linewidth::Int = 2,
-        num_initial_guesses::Int = 1000,
-        solver_tol::Float64 = 1e-8,
-        equilibrium_tol::Float64 = 1e-5,
-        validity_tol::Float64 = 1e-6,
-        stability_tol::Float64 = 1e-6,
-        markersize::Int = 9,
-        markerstrokewidth::Int = 2,
+        trajectory_linewidth::Real = 2,
+        equilibria_kwargs::NamedTuple = (;),
+        markersize::Real = 9,
+        markerstrokewidth::Real = 1.0,
         colored_trajectories::Bool = false,
         contour::Bool = false,
         contour_color::Symbol = :roma,
-        contour_resolution::Int = 150,
-        contour_levels::Int = 10,
+        contour_resolution::Integer = 150,
         colorbar::Bool = false,
-        triangle_linewidth::Int = 2,
+        triangle_linewidth::Real = 2,
         legend::Bool = false,
-        margin::Int = 2,
-        dpi::Int = 300,
+        margin::Integer = 2,
+        dpi::Integer = 300,
+        plot_basins::Bool = false,
+        basin_resolution::Integer = 100,
+        basin_convergence_tol::Real = 0.1,
+        basin_shade::Bool = false,
+        basin_colors::AbstractVector = [],
+        basin_alpha::Real = 0.3,
+        basin_boundary_color = :black,
+        basin_boundary_linewidth::Real = 2,
+        basin_boundary_linestyle::Symbol = :dash,
     )::Plots.Plot
 
 Simulates replicator dynamics trajectories within a 3-strategy simplex, locates equilibria, and creates a ternary plot of the results.
@@ -469,23 +632,27 @@ Simulates replicator dynamics trajectories within a 3-strategy simplex, locates 
 - `trajectory_labels`: Labels for each trajectory if you want a legend. Defaults to "Trajectory i" for i in `1:length(x0_list)`.
 - `trajectory_colors`: Colors for trajectories. If empty, defaults to black for all or a tab10 palette if `colored_trajectories` is true.
 - `trajectory_linewidth`: Width of the lines used for plotting trajectories.
-- `num_initial_guesses`: Number of random initial guesses for root-finding to locate equilibria.
-- `solver_tol`: Tolerance used internally by the nonlinear solver for equilibrium-finding.
-- `equilibrium_tol`: Tolerance for declaring two equilibria to be effectively the same.
-- `validity_tol`: Tolerance for points to be considered inside the simplex (0 ≤ xᵢ ≤ 1).
-- `stability_tol`: Tolerance used when deciding if all eigenvalues have negative real parts (stable).
+- `equilibria_kwargs`: A `NamedTuple` of keyword arguments forwarded verbatim to [`find_equilibria`](@ref) — for example `(num_initial_guesses = 200, stability_tol = 1e-8)`. Accepts `num_initial_guesses`, `solver_tol`, `equilibrium_tol`, `validity_tol` and `stability_tol`.
 - `markersize`: Size of equilibrium markers.
 - `markerstrokewidth`: Stroke width of the equilibrium marker boundary.
 - `colored_trajectories`: If `true`, color each trajectory differently using a color palette; otherwise, use a single color.
 - `contour`: Whether to overlay a contour plot of average payoffs. If `true`, uses `scatter` to color each simplex grid point by its average payoff.
 - `contour_color`: A symbol representing the color gradient (e.g. `:viridis`, `:roma`) for the contour plot.
 - `contour_resolution`: Resolution of the simplex grid for contour plotting.
-- `contour_levels`: Number of contour levels to display (used in color scaling).
 - `colorbar`: Whether to display a color bar when `contour` is `true`.
 - `triangle_linewidth`: Line width for the simplex boundary lines.
 - `legend`: Whether to display a legend for trajectory labels.
 - `margin`: How many rows/columns of the simplex grid to skip from the edges when computing and plotting contour points (avoid overlapping boundaries).
 - `dpi`: Resolution for the final plot.
+- `plot_basins`: If `true` and at least one stable equilibrium exists, shades each basin of attraction and draws the separatrix curves. Works with a single stable equilibrium: the separatrix then separates the basin from the region that flows to unstable boundary points.
+- `basin_resolution`: Side length of the rectangular grid used to classify basins. Higher values give sharper boundaries but require more ODE solves (default `100`).
+- `basin_convergence_tol`: Maximum distance from a stable equilibrium for a trajectory endpoint to count as having converged to it. Points farther than this are labelled "outside all basins" and left unshaded; their boundary with the nearest basin is the separatrix. Default `0.1`.
+- `basin_shade`: If `true`, fill each basin with a translucent color in addition to drawing the separatrix. Default `false`.
+- `basin_colors`: Colors for each basin. Auto-selected from `:tab10` if empty.
+- `basin_alpha`: Transparency of the basin shading (0 = invisible, 1 = opaque). Default `0.3`.
+- `basin_boundary_color`: Color of the separatrix boundary line. Default `:black`.
+- `basin_boundary_linewidth`: Line width of the separatrix. Default `2`.
+- `basin_boundary_linestyle`: Line style of the separatrix (e.g. `:dash`, `:dot`, `:dashdot`, `:solid`). Default `:dash`.
 
 # Returns
 - A `Plots.Plot` object with:
@@ -502,34 +669,41 @@ Simulates replicator dynamics trajectories within a 3-strategy simplex, locates 
     function plot_evolution(
         payoff_functions::Tuple{Function, Function, Function},
         x0_list::Vector{<:AbstractVector{<:Real}},
-        tspan::Tuple{Float64, Float64};
+        tspan::Tuple{Real, Real};
         labels::Vector{} = ["Strategy 1", "Strategy 2", "Strategy 3"],
         extra_params::NamedTuple = NamedTuple(),
-        steady_state_tol::Float64 = 1e-6,
+        steady_state_tol::Real = 1e-6,
         arrow_list::Vector{Vector{Int}} = Vector{Vector{Int}}(),
         trajectory_labels::Vector{String} = String[],
         trajectory_colors::AbstractVector = Any[],
-        trajectory_linewidth::Int = 2,
-        num_initial_guesses::Int = 1000,
-        solver_tol::Float64 = 1e-8,
-        equilibrium_tol::Float64 = 1e-5,
-        validity_tol::Float64 = 1e-6,
-        stability_tol::Float64 = 1e-6,
-        markersize::Int = 9,
-        markerstrokewidth::Int = 2,
+        trajectory_linewidth::Real = 2,
+        equilibria_kwargs::NamedTuple = (;),
+        markersize::Real = 9,
+        markerstrokewidth::Real = 1.0,
         colored_trajectories::Bool = false,
         contour::Bool = false,
         contour_color::Symbol = :roma,
-        contour_resolution::Int = 150,
-        contour_levels::Int = 10,
+        contour_resolution::Integer = 150,
         colorbar::Bool = false,
-        triangle_linewidth::Int = 2,
+        triangle_linewidth::Real = 2,
         legend::Bool = false,
-        margin::Int = 2,
-        dpi::Int = 300,
+        margin::Integer = 2,
+        dpi::Integer = 300,
+        plot_basins::Bool = false,
+        basin_resolution::Integer = 100,
+        basin_convergence_tol::Real = 0.1,
+        basin_shade::Bool = false,
+        basin_colors::AbstractVector = [],
+        basin_alpha::Real = 0.3,
+        basin_boundary_color = :black,
+        basin_boundary_linewidth::Real = 2,
+        basin_boundary_linestyle::Symbol = :dash,
     )::Plots.Plot
 
         num_trajectories = length(x0_list)
+
+        # Integrate in floating point regardless of how the caller spelled the time span
+        tspan = (float(tspan[1]), float(tspan[2]))
 
         # Default labels and colors if not provided
         if isempty(trajectory_labels)
@@ -554,19 +728,15 @@ Simulates replicator dynamics trajectories within a 3-strategy simplex, locates 
 
         # Compute equilibria
         equilibria, stability_status = find_equilibria(
-            payoff_functions, 
-            extra_params,
-            num_initial_guesses = num_initial_guesses,
-            solver_tol = solver_tol,
-            equilibrium_tol = equilibrium_tol,
-            validity_tol = validity_tol,
-            stability_tol = stability_tol
+            payoff_functions;
+            extra_params = extra_params,
+            equilibria_kwargs...
         )
 
         # Start plotting
         if contour
             # Generate the simplex grid without boundary points
-            grid_points = generate_simplex_grid(contour_resolution, margin)
+            grid_points = generate_simplex_grid(contour_resolution; margin = margin)
             X_coords, Y_coords = get_ternary_coordinates(grid_points)
             Z_values = compute_average_payoffs(grid_points, payoff_functions, extra_params)
     
@@ -599,12 +769,86 @@ Simulates replicator dynamics trajectories within a 3-strategy simplex, locates 
             annotate!(p, 0.5, sqrt(3)/2 + 0.1, text(labels[3], :center))
         else
             # Existing code to plot the simplex without contour
-            p = plot_simplex(labels = labels, neutral_edges = neutral_edges, linewidth=triangle_linewidth)
+            p = plot_simplex(
+                labels = labels, 
+                neutral_edges = neutral_edges, 
+                linewidth=triangle_linewidth, 
+                markersize=markersize, 
+                markerstrokewidth=markerstrokewidth
+                )
+        end
+
+        # Basin of attraction shading and separatrix curves
+        if plot_basins
+            stable_indices    = findall(stability_status)
+            stable_eq_points  = [equilibria[i] / sum(equilibria[i]) for i in stable_indices]
+            if length(stable_eq_points) < 1
+                @warn "plot_basins=true but no stable equilibria found — basin plotting skipped."
+            else
+                _basin_colors = isempty(basin_colors) ?
+                    [palette(:tab10)[(i - 1) % 10 + 1] for i in 1:length(stable_eq_points)] :
+                    basin_colors
+
+                xs_b, ys_b, Z_b = basin_label_grid(
+                    params, stable_eq_points, tspan;
+                    resolution = basin_resolution,
+                    steady_state_tol = steady_state_tol,
+                    convergence_tol = basin_convergence_tol,
+                )
+
+                # Shade each basin (label n_stable+1 = "outside all basins", left unshaded)
+                if basin_shade
+                    pt_radius = max(2, ceil(Int, 450 / basin_resolution))
+                    for bi in 1:length(stable_eq_points)
+                        bx = Float64[]
+                        by = Float64[]
+                        for ix in 1:basin_resolution, iy in 1:basin_resolution
+                            if Z_b[ix, iy] == bi
+                                push!(bx, xs_b[ix])
+                                push!(by, ys_b[iy])
+                            end
+                        end
+                        isempty(bx) && continue
+                        scatter!(p, bx, by;
+                            markercolor      = _basin_colors[bi],
+                            markerstrokewidth = 0,
+                            markeralpha      = basin_alpha,
+                            markersize       = pt_radius,
+                            label            = false,
+                        )
+                    end
+
+                    # Redraw simplex edges on top of the basin scatter so they aren't buried.
+                    triangle_x = [0.0, 1.0, 0.5, 0.0]
+                    triangle_y = [0.0, 0.0, sqrt(3)/2, 0.0]
+                    plot!(p, triangle_x, triangle_y;
+                        color     = :black,
+                        linewidth = triangle_linewidth,
+                        legend    = false,
+                    )
+                end
+
+                # Draw separatrix lines.
+                # Levels n+0.5 separate basin n from basin n+1 (or from the "outside" region).
+                # Z_float is transposed so rows index ys (Plots.jl convention).
+                # Zero (outside simplex) is set to NaN to prevent spurious lines at simplex edges.
+                Z_float = Float64.(Z_b)'   # transpose: now Z_float[iy, ix]
+                Z_float[Z_float .== 0.0] .= NaN
+                boundary_levels = [bi + 0.5 for bi in 1:length(stable_eq_points)]
+                contour!(p, xs_b, ys_b, Z_float;
+                    levels     = boundary_levels,
+                    linecolor  = basin_boundary_color,
+                    linewidth  = basin_boundary_linewidth,
+                    linestyle  = basin_boundary_linestyle,
+                    colorbar   = false,
+                    label      = false,
+                )
+            end
         end
 
         # Plotting trajectories
         for i in 1:num_trajectories
-            x0 = x0_list[i] / sum(x0_list[i])  # Ensure x0 sums to 1
+            x0 = collect(float.(x0_list[i])) / sum(x0_list[i])  # Ensure x0 sums to 1
             prob = ODEProblem(replicator_dynamics!, x0, tspan, params)
             sol = solve(prob; callback = cb,
                         saveat = tspan[1]:0.01:tspan[2], tstops = [tspan[2]],
@@ -657,6 +901,8 @@ Simulates replicator dynamics trajectories within a 3-strategy simplex, locates 
             plot_neutral_dots = true, 
             p = p, 
             triangle_linewidth = triangle_linewidth,
+            markersize = markersize,
+            markerstrokewidth = markerstrokewidth,
             dpi = dpi
         )
 
@@ -712,12 +958,7 @@ Simulates replicator dynamics trajectories within a 3-strategy simplex, locates 
             end
         end
 
-        # Show legend if trajectories are labeled
-        if any(.!isempty.(trajectory_labels))
-            plot!(p, legend = legend)
-        else
-            plot!(p, legend = legend)
-        end
+        plot!(p, legend = legend)
 
         return p
     end
@@ -804,7 +1045,7 @@ Checks if a newly found equilibrium already exists in the list of equilibria.
 
 
 """
-    check_stability(x_eq::Vector{Float64}, params::ReplicatorParams; stability_tol::Float64 = 1e-6) -> Bool
+    check_stability(x_eq::AbstractVector{<:Real}, params::ReplicatorParams; stability_tol::Real = 1e-6) -> Bool
 
 Determines the stability of an equilibrium point by analyzing the eigenvalues of the Jacobian matrix of the reduced system.
 
@@ -820,7 +1061,7 @@ Determines the stability of an equilibrium point by analyzing the eigenvalues of
 - The reduced system excludes one variable due to the simplex constraint (sum to 1).
 - Stability is determined by the sign of the real parts of the eigenvalues.
 """
-    function check_stability(x_eq, params::ReplicatorParams; stability_tol::Float64 = 1e-6)
+    function check_stability(x_eq, params::ReplicatorParams; stability_tol::Real = 1e-6)
         # Reduced dynamics function
         function reduced_replicator(x_reduced)
             x1, x2 = x_reduced
@@ -831,8 +1072,8 @@ Determines the stability of an equilibrium point by analyzing the eigenvalues of
             return dx[1:2]
         end
     
-        # Compute Jacobian of the reduced system
-        J_reduced = ForwardDiff.jacobian(reduced_replicator, x_eq[1:2])
+        # Compute Jacobian of the reduced system (ForwardDiff needs a float seed)
+        J_reduced = ForwardDiff.jacobian(reduced_replicator, float.(x_eq[1:2]))
     
         # Compute eigenvalues
         eigenvalues = eigvals(J_reduced)
@@ -851,20 +1092,20 @@ Determines the stability of an equilibrium point by analyzing the eigenvalues of
 
 """
     find_equilibria(
-        payoff_functions::Tuple{Function, Function, Function},
-        params::NamedTuple;
-        num_initial_guesses::Int = 1000,
-        solver_tol::Float64 = 1e-8,
-        equilibrium_tol::Float64 = 1e-5,
-        validity_tol::Float64 = 1e-6,
-        stability_tol::Float64 = 1e-6
+        payoff_functions::Tuple{Function, Function, Function};
+        extra_params::NamedTuple = NamedTuple(),
+        num_initial_guesses::Integer = 1000,
+        solver_tol::Real = 1e-8,
+        equilibrium_tol::Real = 1e-5,
+        validity_tol::Real = 1e-6,
+        stability_tol::Real = 1e-6
     ) -> Tuple{Vector{Vector{Float64}}, Vector{Bool}}
 
 Finds the equilibria of the replicator dynamics system by numerically solving for points where the strategy frequencies stop changing.
 
 # Arguments
 - `payoff_functions`: A tuple of three payoff functions corresponding to each strategy.
-- `params`: Extra parameters for the payoff functions (optional).
+- `extra_params`: Extra parameters for the payoff functions (optional). Named to match the `extra_params` keyword of [`plot_evolution`](@ref).
 - `num_initial_guesses`: Number of initial guesses to use for finding equilibria.
 - `solver_tol`: Tolerance for the numerical solver.
 - `equilibrium_tol`: Tolerance for considering equilibria as unique.
@@ -881,13 +1122,13 @@ Finds the equilibria of the replicator dynamics system by numerically solving fo
 - Filters out equilibria that are outside the simplex or are duplicates.
 """
     function find_equilibria(
-        payoff_functions::Tuple{Function, Function, Function},
-        params::NamedTuple;
-        num_initial_guesses::Int = 1000,
-        solver_tol::Float64 = 1e-8,
-        equilibrium_tol::Float64 = 1e-5,
-        validity_tol::Float64 = 1e-6,
-        stability_tol::Float64 = 1e-6
+        payoff_functions::Tuple{Function, Function, Function};
+        extra_params::NamedTuple = NamedTuple(),
+        num_initial_guesses::Integer = 1000,
+        solver_tol::Real = 1e-8,
+        equilibrium_tol::Real = 1e-5,
+        validity_tol::Real = 1e-6,
+        stability_tol::Real = 1e-6
     )
         equilibria = Vector{Vector{Float64}}()
         stability_status = Vector{Bool}()
@@ -900,7 +1141,7 @@ Finds the equilibria of the replicator dynamics system by numerically solving fo
         initial_guesses = vcat(vertices, initial_guesses)
     
         # Prepare parameters
-        replicator_params = ReplicatorParams(payoff_functions, params)
+        replicator_params = ReplicatorParams(payoff_functions, extra_params)
     
         for x0 in initial_guesses
             # Define the function whose root we want to find
@@ -936,6 +1177,20 @@ Finds the equilibria of the replicator dynamics system by numerically solving fo
     
         # Return equilibria and their stability status
         return equilibria, stability_status
+    end
+
+"""
+    find_equilibria(payoff_functions, extra_params::NamedTuple; kwargs...)
+
+Deprecated positional form retained for backwards compatibility. Pass the payoff parameters
+as the `extra_params` keyword instead.
+"""
+    function find_equilibria(
+        payoff_functions::Tuple{Function, Function, Function},
+        extra_params::NamedTuple;
+        kwargs...
+    )
+        return find_equilibria(payoff_functions; extra_params = extra_params, kwargs...)
     end
 
 end # module Baryplots
